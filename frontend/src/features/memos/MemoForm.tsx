@@ -1,11 +1,17 @@
-import React, { useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
-import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
+import React, { useState, useEffect, useRef } from 'react';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '../../lib/api';
-import type { Memo } from '../../types';
-import { GitCommit, GitPullRequest, AlertCircle, ChevronDown, ChevronUp } from 'lucide-react';
+import { DEMO_SESSION_CONTEXT, isDemoMode } from '../../lib/demo';
+import type { Memo, SessionContext } from '../../types';
+import {
+  GitCommit, GitPullRequest, GitBranch, FileCode, AlertCircle,
+  ExternalLink, ChevronDown, ChevronUp, CheckCircle2, Circle,
+  ArrowRight, Clock,
+} from 'lucide-react';
 import toast from 'react-hot-toast';
+import { timeAgo } from '../../lib/utils';
 
+// ─── Types ────────────────────────────────────────────────────────────────────
 interface MemoFormValues {
   completed: string;
   in_progress: string;
@@ -13,6 +19,14 @@ interface MemoFormValues {
   next_steps: string;
   notes: string;
   is_draft: boolean;
+}
+
+interface MemoFormProps {
+  projectId: string;
+  initial?: Memo;
+  onSuccess?: (memo: Memo) => void;
+  onCancel?: () => void;
+  sessionContext?: SessionContext;
 }
 
 const empty: MemoFormValues = {
@@ -24,30 +38,236 @@ const empty: MemoFormValues = {
   is_draft: false,
 };
 
-interface MemoFormProps {
-  projectId: string;
-  initial?: Memo;
-  onSuccess?: (memo: Memo) => void;
-  onCancel?: () => void;
+// ─── GitHub context panel ─────────────────────────────────────────────────────
+function SessionContextPanel({ ctx }: { ctx: SessionContext }) {
+  const [showFiles, setShowFiles] = useState(false);
+  const [showIssues, setShowIssues] = useState(false);
+
+  const totalAdditions = ctx.commits.reduce((s, c) => s + (c.additions ?? 0), 0);
+  const totalDeletions = ctx.commits.reduce((s, c) => s + (c.deletions ?? 0), 0);
+
+  return (
+    <div className="space-y-3">
+      {/* Branch */}
+      <div className="flex items-center gap-2 px-3 py-2 bg-paper-dark rounded-editorial border border-border">
+        <GitBranch className="w-3.5 h-3.5 text-ink-muted flex-shrink-0" />
+        <code className="text-xs font-mono text-ink font-medium">{ctx.branch}</code>
+        <span className="text-xs text-ink-faint ml-auto">current branch</span>
+      </div>
+
+      {/* Commits */}
+      {ctx.commits.length > 0 && (
+        <div>
+          <p className="text-[10px] font-bold uppercase tracking-widest text-ink-muted mb-1.5 flex items-center gap-1.5">
+            <GitCommit className="w-3 h-3" />
+            {ctx.commits.length} commit{ctx.commits.length > 1 ? 's' : ''}
+            <span className="ml-auto font-mono text-sticky-green normal-case tracking-normal font-normal">
+              +{totalAdditions}
+            </span>
+            <span className="font-mono text-sticky-pink normal-case tracking-normal font-normal">
+              −{totalDeletions}
+            </span>
+          </p>
+          <div className="space-y-1">
+            {ctx.commits.map((c) => (
+              <a
+                key={c.id}
+                href={c.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-start gap-2 group py-1 px-2 rounded hover:bg-paper-dark transition-colors"
+              >
+                <code className="font-mono text-[11px] text-ink-faint flex-shrink-0 mt-0.5 w-14 truncate">
+                  {c.github_id?.slice(0, 7)}
+                </code>
+                <span className="text-xs text-ink-soft leading-snug flex-1 group-hover:text-ink transition-colors">
+                  {c.title}
+                </span>
+                <ExternalLink className="w-3 h-3 text-ink-faint flex-shrink-0 mt-0.5 opacity-0 group-hover:opacity-100 transition-opacity" />
+              </a>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* PRs */}
+      {ctx.pull_requests.length > 0 && (
+        <div>
+          <p className="text-[10px] font-bold uppercase tracking-widest text-ink-muted mb-1.5 flex items-center gap-1.5">
+            <GitPullRequest className="w-3 h-3" />
+            {ctx.pull_requests.length} pull request{ctx.pull_requests.length > 1 ? 's' : ''}
+          </p>
+          <div className="space-y-1">
+            {ctx.pull_requests.map((pr) => (
+              <a
+                key={pr.id}
+                href={pr.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-start gap-2 group py-1 px-2 rounded hover:bg-paper-dark transition-colors"
+              >
+                <code className="font-mono text-[11px] text-ink-faint flex-shrink-0 mt-0.5">
+                  #{pr.pr_number ?? pr.github_id}
+                </code>
+                <span className="text-xs text-ink-soft leading-snug flex-1 group-hover:text-ink transition-colors">
+                  {pr.title}
+                </span>
+                {pr.pr_state && (
+                  <span className={`text-[10px] font-bold uppercase flex-shrink-0 mt-0.5 ${
+                    pr.pr_state === 'merged' ? 'text-sticky-lavender'
+                    : pr.pr_state === 'open'   ? 'text-sticky-green'
+                    : 'text-ink-faint'
+                  }`}>
+                    {pr.pr_state}
+                  </span>
+                )}
+              </a>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Changed files — collapsed by default */}
+      {ctx.changed_files.length > 0 && (
+        <div>
+          <button
+            type="button"
+            className="w-full flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-ink-muted hover:text-ink transition-colors py-1"
+            onClick={() => setShowFiles((v) => !v)}
+          >
+            <FileCode className="w-3 h-3" />
+            {ctx.changed_files.length} changed file{ctx.changed_files.length > 1 ? 's' : ''}
+            <span className="ml-auto">
+              {showFiles ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+            </span>
+          </button>
+          {showFiles && (
+            <div className="mt-1 space-y-0.5">
+              {ctx.changed_files.map((f) => (
+                <div key={f} className="flex items-center gap-1.5 py-0.5 px-2">
+                  <span className="w-1.5 h-1.5 rounded-full bg-sticky-orange flex-shrink-0" />
+                  <code className="text-[11px] font-mono text-ink-muted">{f}</code>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Open issues */}
+      {ctx.open_issues.length > 0 && (
+        <div>
+          <button
+            type="button"
+            className="w-full flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-ink-muted hover:text-ink transition-colors py-1"
+            onClick={() => setShowIssues((v) => !v)}
+          >
+            <Circle className="w-3 h-3" />
+            {ctx.open_issues.length} open issue{ctx.open_issues.length > 1 ? 's' : ''}
+            <span className="ml-auto">
+              {showIssues ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+            </span>
+          </button>
+          {showIssues && (
+            <div className="mt-1 space-y-1">
+              {ctx.open_issues.map((issue) => (
+                <a
+                  key={issue.id}
+                  href={issue.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-start gap-2 group py-1 px-2 rounded hover:bg-paper-dark transition-colors"
+                >
+                  <code className="font-mono text-[11px] text-ink-faint flex-shrink-0 mt-0.5">#{issue.number}</code>
+                  <span className="text-xs text-ink-soft leading-snug flex-1 group-hover:text-ink transition-colors">
+                    {issue.title}
+                  </span>
+                </a>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
 }
 
-export function MemoForm({ projectId, initial, onSuccess, onCancel }: MemoFormProps) {
+// ─── Individual field ──────────────────────────────────────────────────────────
+interface FieldProps {
+  id: string;
+  label: string;
+  sublabel: string;
+  accent: string;         // Tailwind border-color class
+  accentBg: string;       // subtle bg on focus
+  placeholder: string;
+  value: string;
+  onChange: (v: string) => void;
+  rows?: number;
+  required?: boolean;
+  icon: React.ReactNode;
+  hint?: string;
+}
+
+function MemoField({ id, label, sublabel, accent, accentBg, placeholder, value, onChange, rows = 3, required, icon, hint }: FieldProps) {
+  const ref = useRef<HTMLTextAreaElement>(null);
+
+  // Auto-resize
+  useEffect(() => {
+    if (ref.current) {
+      ref.current.style.height = 'auto';
+      ref.current.style.height = Math.max(ref.current.scrollHeight, rows * 24 + 24) + 'px';
+    }
+  }, [value, rows]);
+
+  return (
+    <div className={`border-l-4 ${accent} pl-4 transition-all duration-150`}>
+      <div className="flex items-start gap-2 mb-1">
+        <span className="mt-0.5 flex-shrink-0">{icon}</span>
+        <div className="flex-1">
+          <label htmlFor={id} className="label mb-0 cursor-pointer">
+            {label}
+            {required && <span className="text-sticky-pink ml-1 normal-case tracking-normal font-normal text-xs">required</span>}
+          </label>
+          <p className="text-xs text-ink-faint mt-0.5">{sublabel}</p>
+        </div>
+      </div>
+      <textarea
+        ref={ref}
+        id={id}
+        className={`textarea mt-2 transition-colors duration-150 focus:${accentBg}`}
+        style={{ minHeight: rows * 24 + 24, resize: 'none', overflow: 'hidden' }}
+        placeholder={placeholder}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+      />
+      {hint && value === '' && (
+        <p className="text-[11px] text-ink-faint mt-1 italic">{hint}</p>
+      )}
+    </div>
+  );
+}
+
+// ─── Main form ─────────────────────────────────────────────────────────────────
+export function MemoForm({ projectId, initial, onSuccess, onCancel, sessionContext }: MemoFormProps) {
   const queryClient = useQueryClient();
+  const isDemo = isDemoMode();
+  const isEdit = !!initial;
+
   const [values, setValues] = useState<MemoFormValues>(
     initial
       ? {
-          completed: initial.completed ?? '',
+          completed:   initial.completed   ?? '',
           in_progress: initial.in_progress ?? '',
-          blocked: initial.blocked ?? '',
-          next_steps: initial.next_steps ?? '',
-          notes: initial.notes ?? '',
-          is_draft: initial.is_draft,
+          blocked:     initial.blocked     ?? '',
+          next_steps:  initial.next_steps  ?? '',
+          notes:       initial.notes       ?? '',
+          is_draft:    initial.is_draft,
         }
       : empty
   );
-  const [showActivity, setShowActivity] = useState(false);
 
-  const isEdit = !!initial;
+  // Use provided context, or demo context in demo mode, or null
+  const ctx: SessionContext | null = sessionContext ?? (isDemo && !isEdit ? DEMO_SESSION_CONTEXT : null);
 
   const mutation = useMutation({
     mutationFn: (data: MemoFormValues) =>
@@ -57,160 +277,158 @@ export function MemoForm({ projectId, initial, onSuccess, onCancel }: MemoFormPr
     onSuccess: (memo: Memo) => {
       queryClient.invalidateQueries({ queryKey: ['memos', projectId] });
       queryClient.invalidateQueries({ queryKey: ['dashboard', projectId] });
-      toast.success(isEdit ? 'Memo updated' : 'Memo saved!');
+      toast.success(isEdit ? 'Memo updated' : 'Session saved.');
       onSuccess?.(memo);
     },
     onError: () => toast.error('Failed to save memo'),
   });
 
-  const set = (key: keyof MemoFormValues) => (
-    e: React.ChangeEvent<HTMLTextAreaElement | HTMLInputElement>
-  ) => setValues((v) => ({ ...v, [key]: e.target.value }));
+  const set = (key: keyof MemoFormValues) => (v: string) =>
+    setValues((prev) => ({ ...prev, [key]: v }));
 
-  const handleSubmit = (e: React.FormEvent, draft: boolean) => {
-    e.preventDefault();
-    mutation.mutate({ ...values, is_draft: draft });
-  };
+  const submit = (draft: boolean) => mutation.mutate({ ...values, is_draft: draft });
 
-  return (
-    <form className="space-y-5">
-      {/* Completed */}
-      <Section
-        label="Completed"
-        hint="What did you finish this session?"
-        value={values.completed}
-        onChange={set('completed')}
-        placeholder="- Fixed login validation bug&#10;- Deployed auth service to staging"
-      />
+  const FIELDS: FieldProps[] = [
+    {
+      id: 'completed',
+      label: 'What I finished',
+      sublabel: 'Shipped, merged, or marked done this session',
+      accent: 'border-sticky-green',
+      accentBg: 'bg-sticky-green/5',
+      placeholder: '- Fixed token expiry edge case in src/auth/refresh.ts\n- Merged PR #46: race condition in session invalidation\n- Added rate limiting to /auth/login (10 req/min via Redis)',
+      value: values.completed,
+      onChange: set('completed'),
+      rows: 4,
+      icon: <CheckCircle2 className="w-4 h-4 text-sticky-green" />,
+      hint: 'Be specific — list what actually shipped, not what you started.',
+    },
+    {
+      id: 'in_progress',
+      label: 'Where I left off',
+      sublabel: 'What is actively in progress right now',
+      accent: 'border-sticky-blue',
+      accentBg: 'bg-sticky-blue/5',
+      placeholder: 'Connecting the frontend to the new /auth/refresh endpoint. The token format changed in PR #46 — consumers now receive { accessToken, refreshToken, expiresAt } instead of a bare JWT. Auth interceptor at src/lib/api.ts needs updating.',
+      value: values.in_progress,
+      onChange: set('in_progress'),
+      rows: 3,
+      required: true,
+      icon: <ArrowRight className="w-4 h-4 text-sticky-blue" />,
+      hint: 'Include the specific file or function you were editing.',
+    },
+    {
+      id: 'blocked',
+      label: "What's blocking me",
+      sublabel: 'Blockers, unknowns, or things you need from someone else',
+      accent: 'border-sticky-pink',
+      accentBg: 'bg-sticky-pink/5',
+      placeholder: '- Waiting on DevOps to provision Redis instance in staging (no ETA)\n- Integration tests failing — need to update test fixtures for new token format before CI unblocks',
+      value: values.blocked,
+      onChange: set('blocked'),
+      rows: 3,
+      icon: <AlertCircle className="w-4 h-4 text-sticky-pink" />,
+      hint: 'Leave blank if nothing is blocking you.',
+    },
+    {
+      id: 'next_steps',
+      label: 'What happens next',
+      sublabel: 'One action per line — each becomes a task',
+      accent: 'border-sticky-yellow',
+      accentBg: 'bg-sticky-yellow/10',
+      placeholder: 'Connect frontend to new /auth/refresh endpoint\nFix integration test fixtures for new token format\nNotify mobile team about token format deprecation (deadline: April 1)\nDeploy Google OAuth2 to staging once Redis is provisioned',
+      value: values.next_steps,
+      onChange: set('next_steps'),
+      rows: 5,
+      icon: <Clock className="w-4 h-4 text-sticky-yellow" style={{ filter: 'drop-shadow(0 0 0 #0F0F0F)' }} />,
+      hint: 'These will convert directly into Kanban tasks.',
+    },
+    {
+      id: 'notes',
+      label: 'Important context',
+      sublabel: 'Things another developer must know to continue safely',
+      accent: 'border-border',
+      accentBg: 'bg-paper-dark/40',
+      placeholder: 'The old token format (bare JWT) still works via X-Legacy-Auth header until April 1 — the compatibility shim is in src/auth/compat.ts. After that date it is removed. Notify any teams still on the old format.',
+      value: values.notes,
+      onChange: set('notes'),
+      rows: 3,
+      icon: <FileCode className="w-4 h-4 text-ink-muted" />,
+      hint: 'Assume the reader has context. Write what they would miss without this.',
+    },
+  ];
 
-      {/* In Progress */}
-      <Section
-        label="In Progress"
-        hint="What are you actively working on right now?"
-        value={values.in_progress}
-        onChange={set('in_progress')}
-        placeholder="Frontend auth integration"
-        required
-      />
-
-      {/* Blocked */}
-      <Section
-        label="Blocked"
-        hint="What is preventing you from continuing?"
-        value={values.blocked}
-        onChange={set('blocked')}
-        placeholder="Waiting on API response format from backend team"
-        icon={values.blocked ? <AlertCircle className="w-4 h-4 text-yellow-500" /> : undefined}
-      />
-
-      {/* Next Steps */}
-      <Section
-        label="Next Steps"
-        hint="What should happen next? (one per line — can be converted to tasks)"
-        value={values.next_steps}
-        onChange={set('next_steps')}
-        placeholder="- Connect frontend to new auth endpoint&#10;- Add expired-token handling&#10;- Update auth tests"
-        rows={5}
-      />
-
-      {/* Notes */}
-      <Section
-        label="Notes"
-        hint="Anything else another developer should know"
-        value={values.notes}
-        onChange={set('notes')}
-        placeholder="The token format changed — see PR #42 for details"
-      />
-
-      {/* GitHub Activity preview (only for new memos) */}
-      {!isEdit && (
-        <div className="card border-dashed">
-          <button
-            type="button"
-            className="w-full flex items-center justify-between px-4 py-3 text-sm text-gray-600 hover:text-gray-900"
-            onClick={() => setShowActivity(!showActivity)}
-          >
-            <span className="flex items-center gap-2">
-              <GitCommit className="w-4 h-4 text-gray-400" />
-              GitHub activity will be automatically attached when you save
-            </span>
-            {showActivity ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-          </button>
-          {showActivity && (
-            <div className="px-4 pb-3 text-xs text-gray-400 border-t border-dashed border-gray-200 pt-3">
-              Recent commits and pull requests from your GitHub account will be attached automatically.
-              You can refresh activity after saving.
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Actions */}
-      <div className="flex gap-2 pt-2">
-        {onCancel && (
-          <button type="button" className="btn-secondary" onClick={onCancel}>
-            Cancel
-          </button>
-        )}
-        <button
-          type="button"
-          className="btn-secondary"
-          onClick={(e) => handleSubmit(e as any, true)}
-          disabled={mutation.isPending}
-        >
-          Save as Draft
-        </button>
-        <button
-          type="submit"
-          className="btn-primary"
-          onClick={(e) => handleSubmit(e as any, false)}
-          disabled={mutation.isPending}
-        >
-          {mutation.isPending
-            ? 'Saving…'
-            : isEdit
-            ? 'Update Memo'
-            : 'Save Memo / End Session'}
-        </button>
-      </div>
-    </form>
-  );
-}
-
-function Section({
-  label,
-  hint,
-  value,
-  onChange,
-  placeholder,
-  required,
-  rows = 3,
-  icon,
-}: {
-  label: string;
-  hint: string;
-  value: string;
-  onChange: (e: React.ChangeEvent<HTMLTextAreaElement>) => void;
-  placeholder?: string;
-  required?: boolean;
-  rows?: number;
-  icon?: React.ReactNode;
-}) {
   return (
     <div>
-      <div className="flex items-center gap-1.5 mb-1">
-        {icon}
-        <label className="label mb-0">{label}</label>
-        {required && <span className="text-red-400 text-xs">*</span>}
+      {/* ── Two-column layout on large screens ──────────────── */}
+      <div className="grid grid-cols-1 xl:grid-cols-[280px_1fr] gap-0 xl:gap-8">
+
+        {/* Left: GitHub context panel */}
+        {ctx && (
+          <div className="hidden xl:block">
+            <div className="sticky top-20">
+              <p className="text-[10px] font-bold uppercase tracking-widest text-ink-muted mb-3">
+                This session
+              </p>
+              <SessionContextPanel ctx={ctx} />
+            </div>
+          </div>
+        )}
+
+        {/* Right: form fields */}
+        <div className="space-y-6">
+          {/* Mobile: collapsible GitHub context */}
+          {ctx && (
+            <details className="xl:hidden">
+              <summary className="flex items-center gap-2 text-sm font-semibold text-ink cursor-pointer list-none select-none py-2 border-b border-border">
+                <GitCommit className="w-4 h-4 text-ink-muted" />
+                <span>
+                  {ctx.commits.length} commit{ctx.commits.length > 1 ? 's' : ''} · {ctx.pull_requests.length} PR{ctx.pull_requests.length > 1 ? 's' : ''} · <code className="font-mono text-xs">{ctx.branch}</code>
+                </span>
+                <ChevronDown className="w-4 h-4 text-ink-faint ml-auto" />
+              </summary>
+              <div className="pt-3 pb-1">
+                <SessionContextPanel ctx={ctx} />
+              </div>
+            </details>
+          )}
+
+          {/* Five writing fields */}
+          {FIELDS.map((field) => (
+            <MemoField key={field.id} {...field} />
+          ))}
+
+          {/* ── Submit ────────────────────────────────────────── */}
+          <div className="flex items-center gap-3 pt-2 border-t-2 border-ink/10 flex-wrap">
+            <button
+              type="button"
+              className="btn-end-session"
+              onClick={() => submit(false)}
+              disabled={mutation.isPending || (!values.in_progress.trim())}
+            >
+              {mutation.isPending ? 'Saving…' : isEdit ? 'Update Memo' : 'End Session →'}
+            </button>
+            <button
+              type="button"
+              className="btn-ghost text-sm"
+              onClick={() => submit(true)}
+              disabled={mutation.isPending}
+            >
+              Save draft
+            </button>
+            {onCancel && (
+              <button type="button" className="btn-ghost text-sm ml-auto" onClick={onCancel}>
+                Discard
+              </button>
+            )}
+          </div>
+
+          {!values.in_progress.trim() && (
+            <p className="text-xs text-ink-faint -mt-2">
+              "Where I left off" is required before you can save.
+            </p>
+          )}
+        </div>
       </div>
-      <p className="text-xs text-gray-400 mb-1.5">{hint}</p>
-      <textarea
-        className="textarea"
-        rows={rows}
-        value={value}
-        onChange={onChange}
-        placeholder={placeholder}
-      />
     </div>
   );
 }

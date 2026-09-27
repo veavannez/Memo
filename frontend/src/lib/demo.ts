@@ -6,7 +6,7 @@
 
 import type {
   User, Project, Repository, Memo, Task, TeamMemberStatus,
-  Dashboard, CatchMeUp, GitHubActivity, ProjectMember,
+  Dashboard, CatchMeUp, GitHubActivity, ProjectMember, SessionContext,
 } from '../types';
 
 // ─── Users ───────────────────────────────────────────────────────────────────
@@ -53,12 +53,74 @@ export const DEMO_PROJECT: Project = {
 // ─── GitHub Activity ──────────────────────────────────────────────────────────
 
 export const DEMO_GH_ACTIVITY: GitHubActivity[] = [
-  { id: 1, activity_type: 'commit', github_id: 'a1b2c3d', title: 'fix: resolve token expiry edge case on refresh', url: 'https://github.com/alexrivera/auth-service/commit/a1b2c3d', author_login: 'alexrivera', occurred_at: '2024-03-14T16:22:00Z' },
-  { id: 2, activity_type: 'commit', github_id: 'e4f5a6b', title: 'feat: add rate limiting to /auth/login endpoint', url: 'https://github.com/alexrivera/auth-service/commit/e4f5a6b', author_login: 'alexrivera', occurred_at: '2024-03-14T14:10:00Z' },
-  { id: 3, activity_type: 'commit', github_id: 'c7d8e9f', title: 'test: add unit tests for JWT validation middleware', url: 'https://github.com/alexrivera/auth-service/commit/c7d8e9f', author_login: 'alexrivera', occurred_at: '2024-03-14T11:45:00Z' },
-  { id: 4, activity_type: 'pull_request', github_id: '47', title: 'feat: Google OAuth2 provider integration', url: 'https://github.com/alexrivera/auth-service/pull/47', author_login: 'priyasharma', occurred_at: '2024-03-13T15:00:00Z' },
-  { id: 5, activity_type: 'pull_request', github_id: '46', title: 'fix: race condition in session invalidation', url: 'https://github.com/alexrivera/auth-service/pull/46', author_login: 'alexrivera', occurred_at: '2024-03-12T10:30:00Z' },
+  {
+    id: 1, activity_type: 'commit', github_id: 'a1b2c3d',
+    title: 'fix: resolve token expiry edge case on refresh',
+    url: 'https://github.com/alexrivera/auth-service/commit/a1b2c3d',
+    author_login: 'alexrivera', occurred_at: '2024-03-14T16:22:00Z',
+    branch: 'feat/token-refresh',
+    changed_files: ['src/auth/token.ts', 'src/auth/refresh.ts', 'tests/auth/token.test.ts'],
+    additions: 34, deletions: 12,
+  },
+  {
+    id: 2, activity_type: 'commit', github_id: 'e4f5a6b',
+    title: 'feat: add rate limiting to /auth/login endpoint',
+    url: 'https://github.com/alexrivera/auth-service/commit/e4f5a6b',
+    author_login: 'alexrivera', occurred_at: '2024-03-14T14:10:00Z',
+    branch: 'feat/token-refresh',
+    changed_files: ['src/middleware/rateLimit.ts', 'src/routes/auth.ts', 'config/redis.ts'],
+    additions: 89, deletions: 5,
+  },
+  {
+    id: 3, activity_type: 'commit', github_id: 'c7d8e9f',
+    title: 'test: add unit tests for JWT validation middleware',
+    url: 'https://github.com/alexrivera/auth-service/commit/c7d8e9f',
+    author_login: 'alexrivera', occurred_at: '2024-03-14T11:45:00Z',
+    branch: 'feat/token-refresh',
+    changed_files: ['tests/middleware/jwt.test.ts', 'tests/fixtures/tokens.ts'],
+    additions: 142, deletions: 0,
+  },
+  {
+    id: 4, activity_type: 'pull_request', github_id: '47',
+    title: 'feat: Google OAuth2 provider integration',
+    url: 'https://github.com/alexrivera/auth-service/pull/47',
+    author_login: 'priyasharma', occurred_at: '2024-03-13T15:00:00Z',
+    pr_state: 'merged', pr_number: 47,
+    changed_files: ['src/auth/providers/google.ts', 'src/auth/oauth.ts', 'config/providers.ts'],
+    additions: 218, deletions: 14,
+  },
+  {
+    id: 5, activity_type: 'pull_request', github_id: '46',
+    title: 'fix: race condition in session invalidation',
+    url: 'https://github.com/alexrivera/auth-service/pull/46',
+    author_login: 'alexrivera', occurred_at: '2024-03-12T10:30:00Z',
+    pr_state: 'merged', pr_number: 46,
+    changed_files: ['src/auth/session.ts', 'src/auth/invalidate.ts'],
+    additions: 31, deletions: 28,
+  },
 ];
+
+// ─── Session context — shown before END SESSION form ─────────────────────────
+
+export const DEMO_SESSION_CONTEXT: SessionContext = {
+  branch: 'feat/token-refresh',
+  commits: DEMO_GH_ACTIVITY.filter((a) => a.activity_type === 'commit'),
+  pull_requests: DEMO_GH_ACTIVITY.filter((a) => a.activity_type === 'pull_request'),
+  changed_files: [
+    'src/auth/token.ts',
+    'src/auth/refresh.ts',
+    'src/middleware/rateLimit.ts',
+    'src/routes/auth.ts',
+    'config/redis.ts',
+    'tests/auth/token.test.ts',
+    'tests/middleware/jwt.test.ts',
+    'tests/fixtures/tokens.ts',
+  ],
+  open_issues: [
+    { id: 101, number: 38, title: 'Rate limiting breaks multi-region deployments', url: 'https://github.com/alexrivera/auth-service/issues/38' },
+    { id: 102, number: 41, title: 'JWT refresh loop on slow connections', url: 'https://github.com/alexrivera/auth-service/issues/41' },
+  ],
+};
 
 // ─── Tasks ────────────────────────────────────────────────────────────────────
 

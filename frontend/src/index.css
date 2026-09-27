@@ -379,6 +379,15 @@
   .badge-member      { @apply badge bg-paper-dark    text-ink-muted border-border;  }
   .badge-demo        { @apply badge bg-sticky-yellow text-ink       border-ink/30; }
 
+  /* ── DIFF STAT ───────────────────────────────────────── */
+  /* Tailwind purges dynamic classes — define these explicitly */
+  .text-sticky-green  { color: #A8E6A3; }
+  .text-sticky-pink   { color: #F4A7B9; }
+  .text-sticky-yellow { color: #F5E642; }
+  .text-sticky-lavender { color: #C5B8F5; }
+  /* bg-sticky-pink/8 is used in MemoDetailPage blocked section */
+  .bg-sticky-pink\/8  { background-color: rgb(244 167 185 / 0.08); }
+
   /* ── NAVIGATION ──────────────────────────────────────── */
   .nav-root {
     @apply bg-paper-cream border-b-2 border-ink sticky top-0 z-50;

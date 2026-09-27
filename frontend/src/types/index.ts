@@ -57,6 +57,22 @@ export interface GitHubActivity {
   url?: string;
   author_login?: string;
   occurred_at?: string;
+  // enriched fields (present when available from GitHub API)
+  branch?: string;
+  changed_files?: string[];
+  additions?: number;
+  deletions?: number;
+  pr_state?: 'open' | 'closed' | 'merged';
+  pr_number?: number;
+}
+
+/** Pre-flight context shown in the END SESSION form before the developer writes. */
+export interface SessionContext {
+  branch: string;
+  commits: GitHubActivity[];
+  pull_requests: GitHubActivity[];
+  changed_files: string[];
+  open_issues: { id: number; number: number; title: string; url: string }[];
 }
 
 export interface Memo {
