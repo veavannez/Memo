@@ -2,12 +2,13 @@
 Auth routes — GitHub OAuth flow and session management.
 """
 import secrets
+from urllib.parse import urlencode
 from datetime import datetime, timezone
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Response, status, Cookie
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, status, Cookie
 from sqlmodel.ext.asyncio.session import AsyncSession
-from sqlalchemy import select
+from sqlmodel import select
 
 from app.core.config import settings
 from app.core.database import get_session
@@ -24,21 +25,36 @@ _oauth_states: dict[str, str] = {}
 
 
 @router.get("/github/login")
-async def github_login():
+async def github_login(request: Request):
     """Redirect URL generator for GitHub OAuth flow."""
+    if not settings.GITHUB_APP_CLIENT_ID or not settings.GITHUB_APP_CLIENT_SECRET:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=(
+                "GitHub OAuth is not configured. Set GITHUB_APP_CLIENT_ID and "
+                "GITHUB_APP_CLIENT_SECRET in backend/.env, then restart the backend."
+            ),
+        )
+
     state = secrets.token_urlsafe(32)
     _oauth_states[state] = state
     install_url = (
         f"https://github.com/apps/{settings.GITHUB_APP_SLUG}/installations/new"
         f"?state={state}"
     )
-    # For web flow, redirect to GitHub authorization
-    auth_url = (
-        f"https://github.com/login/oauth/authorize"
-        f"?client_id={settings.GITHUB_APP_CLIENT_ID}"
-        f"&state={state}"
-        f"&scope=read:user,user:email"
+    # Bind OAuth to the frontend origin that initiated the request.
+    request_origin = request.headers.get("origin", "").rstrip("/")
+    frontend_origin = (
+        request_origin if request_origin in settings.cors_origins
+        else settings.FRONTEND_URL.rstrip("/")
     )
+    redirect_uri = f"{frontend_origin}/auth/callback"
+    auth_url = "https://github.com/login/oauth/authorize?" + urlencode({
+        "client_id": settings.GITHUB_APP_CLIENT_ID,
+        "redirect_uri": redirect_uri,
+        "state": state,
+        "scope": "read:user,user:email",
+    })
     return {
         "auth_url": auth_url,
         "install_url": install_url,

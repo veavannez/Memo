@@ -63,7 +63,10 @@ class User(SQLModel, table=True):
 
     # Relationships
     github_account: Optional["GitHubAccount"] = Relationship(back_populates="user")
-    project_memberships: List["ProjectMember"] = Relationship(back_populates="user")
+    project_memberships: List["ProjectMember"] = Relationship(
+        back_populates="user",
+        sa_relationship_kwargs={"foreign_keys": "[ProjectMember.user_id]"},
+    )
     memos: List["Memo"] = Relationship(back_populates="author")
     tasks: List["Task"] = Relationship(back_populates="assignee")
 
@@ -283,6 +286,29 @@ class Task(SQLModel, table=True):
     project: Optional[Project] = Relationship(back_populates="tasks")
     source_memo: Optional[Memo] = Relationship(back_populates="tasks")
     assignee: Optional[User] = Relationship(back_populates="tasks")
+
+class DetectedGapRecord(SQLModel, table=True):
+    """A reviewable AI suggestion. It never changes project state by itself."""
+    __tablename__ = "detected_gaps"
+    __table_args__ = (
+        UniqueConstraint("project_id", "source_key", name="uq_detected_gaps_project_source"),
+        Index("ix_detected_gaps_project_id", "project_id"),
+        Index("ix_detected_gaps_status", "status"),
+    )
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    project_id: int = Field(sa_column=Column(Integer, ForeignKey("projects.id", ondelete="CASCADE"), nullable=False))
+    source_key: str = Field(sa_column=Column(String(64), nullable=False))
+    category: str = Field(sa_column=Column(String(50), nullable=False))
+    title: str = Field(sa_column=Column(String(512), nullable=False))
+    description: str = Field(sa_column=Column(Text, nullable=False))
+    reason: str = Field(sa_column=Column(Text, nullable=False))
+    confidence: float = Field(default=0.5, nullable=False)
+    evidence_json: str = Field(default="[]", sa_column=Column(Text, nullable=False))
+    status: str = Field(default="active", sa_column=Column(String(50), nullable=False, default="active"))
+    created_task_id: Optional[int] = Field(default=None, sa_column=Column(Integer, ForeignKey("tasks.id", ondelete="SET NULL"), nullable=True))
+    created_at: datetime = Field(default_factory=utcnow, sa_column=Column(DateTime(timezone=True), nullable=False))
+    updated_at: datetime = Field(default_factory=utcnow, sa_column=Column(DateTime(timezone=True), nullable=False))
 
 
 # ─────────────────────────────────────────────

@@ -1,8 +1,9 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../features/auth/AuthContext';
+import api from '../lib/api';
+import toast from 'react-hot-toast';
 
-const BACKEND_URL = import.meta.env.VITE_API_URL?.replace('/api/v1', '') || 'http://localhost:8000';
 
 // Staggered sticky note data — represents real MEMO workflow stages
 const STICKIES = [
@@ -54,6 +55,16 @@ export default function LandingPage() {
     navigate('/projects');
   };
 
+  const handleGitHubLogin = async () => {
+    try {
+      const { data } = await api.get<{ auth_url: string }>('/auth/github/login');
+      window.location.assign(data.auth_url);
+    } catch (error: any) {
+      const detail = error?.response?.data?.detail;
+      toast.error(typeof detail === 'string' ? detail : 'Could not start GitHub sign-in.');
+    }
+  };
+
   return (
     <div className="min-h-screen bg-paper font-sans overflow-x-hidden">
 
@@ -70,7 +81,7 @@ export default function LandingPage() {
             Try Demo
           </button>
           <a
-            href={`${BACKEND_URL}/api/v1/auth/github`}
+            href="#" onClick={(event) => { event.preventDefault(); handleGitHubLogin(); }}
             className="btn-primary text-sm px-4 py-2"
           >
             Sign in with GitHub
@@ -104,7 +115,7 @@ export default function LandingPage() {
 
           <div className="flex flex-wrap gap-3 fade-up-2">
             <a
-              href={`${BACKEND_URL}/api/v1/auth/github`}
+              href="#" onClick={(event) => { event.preventDefault(); handleGitHubLogin(); }}
               className="btn-primary text-base px-6 py-3"
             >
               <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
@@ -243,7 +254,7 @@ export default function LandingPage() {
         <p className="text-lg text-ink-soft mb-8">Start your first project in 60 seconds. No credit card. GitHub account required only for real repos.</p>
         <div className="flex flex-col sm:flex-row gap-3 justify-center">
           <a
-            href={`${BACKEND_URL}/api/v1/auth/github`}
+            href="#" onClick={(event) => { event.preventDefault(); handleGitHubLogin(); }}
             className="btn-primary text-base px-8 py-4"
           >
             Connect GitHub →

@@ -1,12 +1,14 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
+import axios from 'axios';
 import { Link, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import api from '../lib/api';
-import { DEMO_PROJECT, isDemoMode } from '../lib/demo';
+import { DEMO_PROJECT, activateDemoMode, deactivateDemoMode, isDemoMode } from '../lib/demo';
 import type { Project } from '../types';
 import { Plus, GitBranch, Lock, Globe, ArrowRight, FlaskConical, Zap } from 'lucide-react';
+import toast from 'react-hot-toast';
 
-// ─── Demo project card ────────────────────────────────────────────────────────
+// â”€â”€â”€ Demo project card â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function DemoProjectCard({ onClick }: { onClick: () => void }) {
   return (
     <button
@@ -42,6 +44,7 @@ function DemoProjectCard({ onClick }: { onClick: () => void }) {
 
 export default function ProjectsPage() {
   const navigate = useNavigate();
+  const [isConnecting, setIsConnecting] = useState(false);
 
   const isDemo = isDemoMode();
 
@@ -53,17 +56,24 @@ export default function ProjectsPage() {
     },
   });
 
-  const createProject = useMutation({
-    mutationFn: (data: { name: string; description: string; repository_id: number }) =>
-      api.post('/projects', data).then((r) => r.data),
-    onSuccess: (project: Project) => {
-      queryClient.invalidateQueries({ queryKey: ['projects'] });
-      toast.success('Project created!');
-      navigate(`/projects/${project.id}`);
-    },
-    onError: () => toast.error('Failed to create project'),
-  });
-
+  const handleConnectGitHub = async () => {
+    setIsConnecting(true);
+    deactivateDemoMode();
+    localStorage.removeItem('access_token');
+    try {
+      const { data } = await api.get<{ auth_url: string }>('/auth/github/login');
+      window.location.assign(data.auth_url);
+    } catch (error) {
+      activateDemoMode();
+      setIsConnecting(false);
+      const detail = axios.isAxiosError(error) ? error.response?.data?.detail : null;
+      toast.error(
+        typeof detail === 'string'
+          ? detail
+          : 'Could not start GitHub connection. Check that the backend is running and allows this frontend origin.',
+      );
+    }
+  };
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
@@ -81,7 +91,12 @@ export default function ProjectsPage() {
           <h1 className="text-2xl font-bold text-ink mb-1">Your Projects</h1>
           <p className="text-sm text-ink-muted">Connect a GitHub repository and start leaving memos.</p>
         </div>
-        {!isDemo && (
+        {isDemo ? (
+          <button className="btn-primary" onClick={handleConnectGitHub} disabled={isConnecting}>
+            <GitBranch className="w-4 h-4" />
+            {isConnecting ? 'Connectingâ€¦' : 'Connect GitHub'}
+          </button>
+        ) : (
           <button className="btn-primary" onClick={() => navigate('/projects/new')}>
             <Plus className="w-4 h-4" />
             New Project
@@ -158,7 +173,7 @@ export default function ProjectsPage() {
             <div>
               <p className="font-semibold text-ink text-sm mb-1">How MEMO works</p>
               <p className="text-xs text-ink-muted leading-relaxed">
-                Connect a GitHub repository → End each coding session with a structured memo → Convert next steps to tasks → Use <strong>Catch Me Up</strong> when you return.
+                Connect a GitHub repository â†’ End each coding session with a structured memo â†’ Convert next steps to tasks â†’ Use <strong>Catch Me Up</strong> when you return.
               </p>
             </div>
           </div>

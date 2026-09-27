@@ -8,7 +8,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import settings
-from app.api import auth, github, projects, memos, tasks, catchmeup, webhooks
+from app.api import auth, github, projects, memos, tasks, catchmeup, webhooks, intelligence
 
 logging.basicConfig(
     level=logging.INFO,
@@ -53,6 +53,7 @@ app.include_router(projects.router, prefix="/api/v1")
 app.include_router(memos.router, prefix="/api/v1")
 app.include_router(tasks.router, prefix="/api/v1")
 app.include_router(catchmeup.router, prefix="/api/v1")
+app.include_router(intelligence.router, prefix="/api/v1")
 app.include_router(webhooks.router, prefix="/api/v1")
 
 

@@ -10,7 +10,7 @@ import {
 import type { Project } from './types/index';
 import {
   LayoutDashboard, FileText, CheckSquare, Kanban, Zap,
-  LogOut, ChevronRight, Plus, FlaskConical, GitBranch,
+  LogOut, ChevronRight, Plus, FlaskConical, GitBranch, Brain,
 } from 'lucide-react';
 
 // ─── Minimal inline avatar (avoids circular import with ui/index.tsx) ─────────
@@ -48,12 +48,13 @@ function AppShell() {
 
   const navItems = projectId
     ? [
-        { to: `/projects/${projectId}`,              label: 'Dashboard',   icon: LayoutDashboard, color: 'bg-sticky-blue'     },
-        { to: `/projects/${projectId}/context`,      label: 'Context',     icon: GitBranch,        color: 'bg-sticky-green'    },
-        { to: `/projects/${projectId}/memos`,        label: 'Memos',       icon: FileText,         color: 'bg-sticky-yellow'   },
-        { to: `/projects/${projectId}/tasks`,        label: 'Tasks',       icon: CheckSquare,      color: 'bg-sticky-lavender' },
-        { to: `/projects/${projectId}/kanban`,       label: 'Kanban',      icon: Kanban,           color: 'bg-sticky-pink'     },
-        { to: `/projects/${projectId}/catch-me-up`,  label: 'Catch Me Up', icon: Zap,              color: 'bg-sticky-orange'   },
+        { to: `/projects/${projectId}`,                label: 'Dashboard',     icon: LayoutDashboard, color: 'bg-sticky-blue'     },
+        { to: `/projects/${projectId}/context`,        label: 'Context',       icon: GitBranch,        color: 'bg-sticky-green'    },
+        { to: `/projects/${projectId}/intelligence`,   label: 'Intelligence',  icon: Brain,            color: 'bg-sticky-lavender' },
+        { to: `/projects/${projectId}/memos`,          label: 'Memos',         icon: FileText,         color: 'bg-sticky-yellow'   },
+        { to: `/projects/${projectId}/tasks`,          label: 'Tasks',         icon: CheckSquare,      color: 'bg-sticky-lavender' },
+        { to: `/projects/${projectId}/kanban`,         label: 'Kanban',        icon: Kanban,           color: 'bg-sticky-pink'     },
+        { to: `/projects/${projectId}/catch-me-up`,    label: 'Catch Me Up',   icon: Zap,              color: 'bg-sticky-orange'   },
       ]
     : [];
 

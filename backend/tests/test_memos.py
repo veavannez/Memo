@@ -3,6 +3,7 @@ Integration tests for Memo API endpoints.
 """
 import pytest
 from tests.conftest import auth_headers
+from app.models.models import User
 
 
 @pytest.mark.asyncio
@@ -122,7 +123,6 @@ async def test_memo_only_author_can_edit(client, session, test_project):
 async def test_memo_not_visible_outside_project(client, session, test_project, test_user):
     """A user not in the project cannot read memos."""
     outsider = User(display_name="Outsider", email="outsider@example.com")
-    from app.models.models import User
     session.add(outsider)
     await session.commit()
     await session.refresh(outsider)

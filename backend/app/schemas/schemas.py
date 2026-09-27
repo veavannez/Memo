@@ -3,8 +3,8 @@ Pydantic schemas for API request/response validation.
 Separated from SQLModel table models to keep API contracts explicit.
 """
 from datetime import datetime
-from typing import Optional, List
-from pydantic import BaseModel, EmailStr, field_validator
+from typing import Optional, List, Any, Dict
+from pydantic import BaseModel, EmailStr, field_validator, field_serializer
 from app.models.models import ProjectRole, TaskStatus, TaskPriority
 
 
@@ -265,6 +265,104 @@ class DashboardResponse(BaseModel):
     team: List[TeamMemberStatus] = []
     recent_memos: List[MemoRead] = []
     recent_tasks: List[TaskRead] = []
+
+
+# ─────────────────────────────────────────────
+# watsonx.ai Intelligence
+# ─────────────────────────────────────────────
+
+class EvidencedItem(BaseModel):
+    """A project-state item grounded in evidence with a confidence score."""
+    title: str
+    evidence: List[str] = []
+    confidence: float = 0.5
+    reason: Optional[str] = None
+
+
+class DetectedGap(BaseModel):
+    """A potential gap grounded in observed development evidence."""
+    title: str
+    description: str
+    reason: str
+    confidence: float
+    evidence: List[str] = []
+    id: Optional[int] = None
+    category: str = "IMPLEMENTATION"
+    status: str = "active"
+    created_task_id: Optional[int] = None
+
+
+class DetectedGapUpdate(BaseModel):
+    title: Optional[str] = None
+    description: Optional[str] = None
+    category: Optional[str] = None
+
+
+class DetectedGapTaskCreate(BaseModel):
+    title: Optional[str] = None
+    description: Optional[str] = None
+    priority: str = "medium"
+
+
+class SuggestedNextStep(BaseModel):
+    title: str
+    description: str
+    confidence: float
+    evidence: List[str] = []
+
+class ProjectState(BaseModel):
+    completed: List[EvidencedItem] = []
+    inProgress: List[EvidencedItem] = []
+    blocked: List[EvidencedItem] = []
+
+
+class ProjectAnalysisResponse(BaseModel):
+    """Full project intelligence analysis from watsonx.ai."""
+    projectState: ProjectState
+    detectedGaps: List[DetectedGap] = []
+    suggestedNextSteps: List[SuggestedNextStep] = []
+    generatedAt: str
+    modelId: str
+    isFallback: bool = False
+    # True when watsonx.ai is not configured
+    aiAvailable: bool = True
+
+
+class GeneratedMemoContent(BaseModel):
+    """AI-generated memo fields — validated before use."""
+    completed: Optional[str] = None
+    in_progress: Optional[str] = None
+    blocked: Optional[str] = None
+    next_steps: Optional[str] = None
+    notes: Optional[str] = None
+    generatedAt: str
+    isFallback: bool = False
+
+
+class CatchUpAIEnrichment(BaseModel):
+    """AI enrichment for the Catch Me Up view."""
+    whileYouWereAway: str
+    whatChanged: List[str] = []
+    whatNeedsAttention: List[str] = []
+    yourNextStep: str
+    confidence: float
+    generatedAt: str
+    isFallback: bool = False
+
+
+class TaskAssignmentSuggestion(BaseModel):
+    task_id: Any  # can be int or string depending on source
+    suggested_assignee: Optional[str] = None
+    reason: str
+    confidence: float
+    evidence: List[str] = []
+
+
+class WatsonxStatusResponse(BaseModel):
+    available: bool
+    model_id: str
+    project_id_set: bool
+    api_key_set: bool
 
 
 # ─────────────────────────────────────────────

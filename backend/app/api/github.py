@@ -4,7 +4,7 @@ GitHub integration routes — installations, repositories, and project context.
 from typing import List, Optional, Any, Dict
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlmodel.ext.asyncio.session import AsyncSession
-from sqlalchemy import select
+from sqlmodel import select
 from datetime import datetime, timezone
 
 from app.core.database import get_session

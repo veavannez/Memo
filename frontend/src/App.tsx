@@ -19,6 +19,7 @@ import TasksPage from './pages/TasksPage';
 import KanbanPage from './pages/KanbanPage';
 import CatchMeUpPage from './pages/CatchMeUpPage';
 import ProjectContextPage from './pages/ProjectContextPage';
+import ProjectIntelligencePage from './pages/ProjectIntelligencePage';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -61,6 +62,7 @@ function AppRoutes() {
         <Route path="/projects/new" element={<RepositorySelectionPage />} />
         <Route path="/projects/:projectId" element={<DashboardPage />} />
         <Route path="/projects/:projectId/context" element={<ProjectContextPage />} />
+        <Route path="/projects/:projectId/intelligence" element={<ProjectIntelligencePage />} />
         <Route path="/projects/:projectId/memos" element={<MemosHistoryPage />} />
         <Route path="/projects/:projectId/memos/new" element={<CreateMemoPage />} />
         <Route path="/projects/:projectId/memos/:memoId" element={<MemoDetailPage />} />

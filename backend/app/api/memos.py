@@ -7,7 +7,7 @@ from datetime import datetime, timezone, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlmodel.ext.asyncio.session import AsyncSession
-from sqlalchemy import select
+from sqlmodel import select
 
 from app.core.database import get_session
 from app.models.models import (

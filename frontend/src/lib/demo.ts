@@ -6,7 +6,7 @@
 
 import type {
   User, Project, Repository, Memo, Task, TeamMemberStatus,
-  Dashboard, CatchMeUp, GitHubActivity, ProjectMember, SessionContext,
+  Dashboard, CatchMeUp, GitHubActivity, ProjectMember, SessionContext, ProjectAnalysis,
 } from '../types';
 
 // ─── Users ───────────────────────────────────────────────────────────────────
@@ -122,6 +122,49 @@ export const DEMO_SESSION_CONTEXT: SessionContext = {
   ],
 };
 
+export const DEMO_PROJECT_ANALYSIS: ProjectAnalysis = {
+  projectState: {
+    completed: [{ title: 'Refresh-token backend endpoint implemented', confidence: 0.94, evidence: ['src/auth/refresh.ts', 'src/routes/auth.ts', 'commit a1b2c3d'] }],
+    inProgress: [{ title: 'Frontend token refresh integration', confidence: 0.78, evidence: ['branch feat/token-refresh', 'Issue #41'], reason: 'Backend work is visible while client integration remains active.' }],
+    blocked: [],
+  },
+  detectedGaps: [
+    {
+      id: 101, category: 'TESTING', status: 'active',
+      title: 'Add expired refresh-token test',
+      description: 'Refresh-token logic changed, but the observed tests cover token validation rather than an expired refresh token.',
+      reason: 'The activity shows src/auth/refresh.ts changing while no expired-refresh test appears in the same evidence window.',
+      confidence: 0.86,
+      evidence: ['src/auth/refresh.ts', 'tests/auth/token.test.ts', 'commit a1b2c3d'],
+    },
+    {
+      id: 102, category: 'INTEGRATION', status: 'active',
+      title: 'Complete frontend refresh integration',
+      description: 'The backend refresh endpoint and new token format are present, while client handling is still described as in progress.',
+      reason: 'Backend implementation and an open integration task point to a cross-layer gap.',
+      confidence: 0.91,
+      evidence: ['src/routes/auth.ts', 'src/auth/refresh.ts', 'Task: Connect frontend to new /auth/refresh endpoint'],
+    },
+    {
+      id: 103, category: 'ERROR HANDLING', status: 'active',
+      title: 'Handle an unrecoverable expired session in the UI',
+      description: 'Issue evidence describes a refresh loop and the task list calls for a session-expired dialog.',
+      reason: 'Existing evidence suggests the failure path is known but not complete.',
+      confidence: 0.74,
+      evidence: ['Issue #41: JWT refresh loop on slow connections', 'Task: Add expired-token handling UI'],
+    },
+  ],
+  suggestedNextSteps: [{
+    title: 'Finish client integration, then add the expired-token scenario',
+    description: 'Review the evidence, create only the tasks that match the intended behavior, and validate the full refresh flow.',
+    confidence: 0.84,
+    evidence: ['src/auth/refresh.ts', 'Issue #41', 'branch feat/token-refresh'],
+  }],
+  generatedAt: '2024-03-14T18:00:00Z',
+  modelId: 'ibm/granite-3-8b-instruct',
+  isFallback: false,
+  aiAvailable: true,
+};
 // ─── Tasks ────────────────────────────────────────────────────────────────────
 
 export const DEMO_TASKS: Task[] = [

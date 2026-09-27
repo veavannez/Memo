@@ -1,13 +1,15 @@
 import React, { useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation } from '@tanstack/react-query';
 import api from '../lib/api';
 import { DEMO_CATCH_ME_UP, isDemoMode } from '../lib/demo';
-import type { CatchMeUp } from '../types';
+import type { CatchMeUp, CatchUpAIEnrichment } from '../types';
 import { timeAgo, statusBadgeClass, getStatusLabel } from '../lib/utils';
+import { generateCatchUpEnrichment } from '../lib/watsonx';
 import {
   GitCommit, GitPullRequest, AlertTriangle, ArrowRight, Clock,
   FileText, CheckSquare, Zap, Plus, ChevronDown, ChevronUp,
+  Brain, Sparkles, RefreshCw,
 } from 'lucide-react';
 
 export default function CatchMeUpPage() {
@@ -15,6 +17,7 @@ export default function CatchMeUpPage() {
   const [showGitHub, setShowGitHub] = useState(false);
   const isDemo = isDemoMode();
 
+  // Hooks must be called unconditionally — before any early returns
   const { data, isLoading, error, refetch } = useQuery<CatchMeUp>({
     queryKey: ['catch-me-up', projectId],
     queryFn: () => {
@@ -22,6 +25,14 @@ export default function CatchMeUpPage() {
       return api.get(`/projects/${projectId}/catch-me-up`).then((r) => r.data);
     },
     enabled: !!projectId,
+  });
+
+  const {
+    data: aiEnrichment,
+    isPending: aiLoading,
+    mutate: runAI,
+  } = useMutation<CatchUpAIEnrichment, Error>({
+    mutationFn: () => generateCatchUpEnrichment(projectId!),
   });
 
   if (isLoading) {
@@ -71,7 +82,7 @@ export default function CatchMeUpPage() {
             { label: 'Create Tasks', color: 'bg-sticky-green',  done: true  },
             { label: 'Kanban',       color: 'bg-sticky-blue',   done: false },
             { label: 'Catch Me Up',  color: 'bg-sticky-orange', active: true },
-          ].map(({ label, color, done, active }) => (
+          ].map(({ label, done, active }) => (
             <div key={label} className={done ? 'workflow-step text-ink-faint line-through' : active ? 'workflow-step-active' : 'workflow-step'}>
               <span className={done ? 'workflow-step-dot bg-sticky-green' : active ? 'workflow-step-dot-active' : 'workflow-step-dot'} />
               {label}
@@ -259,13 +270,119 @@ export default function CatchMeUpPage() {
         </div>
       )}
 
+      {/* ── AI Enrichment ────────────────────────────────────── */}
+      {!isDemo && (
+        <div className="card mb-8">
+          <div className="flex items-center justify-between px-4 py-3 border-b border-border">
+            <span className="flex items-center gap-2 text-sm font-semibold text-ink">
+              <Brain className="w-4 h-4 text-sticky-lavender" />
+              AI Insight
+              {aiEnrichment && !aiEnrichment.isFallback && (
+                <span className="text-xs font-normal text-ink-faint">
+                  · {Math.round(aiEnrichment.confidence * 100)}% confidence
+                </span>
+              )}
+            </span>
+            {!aiEnrichment && !aiLoading && (
+              <button
+                className="btn-ghost text-xs"
+                onClick={() => runAI()}
+              >
+                <Sparkles className="w-3.5 h-3.5" /> Ask AI
+              </button>
+            )}
+            {aiLoading && (
+              <span className="text-xs text-ink-faint animate-pulse flex items-center gap-1">
+                <RefreshCw className="w-3 h-3 animate-spin" /> Thinking…
+              </span>
+            )}
+          </div>
+
+          {!aiEnrichment && !aiLoading && (
+            <div className="px-4 py-4 text-center">
+              <p className="text-xs text-ink-faint">
+                Ask watsonx.ai to interpret recent activity and suggest your next step.
+              </p>
+            </div>
+          )}
+
+          {aiEnrichment && (
+            <div className="px-4 py-4 space-y-4">
+              {/* While you were away */}
+              {aiEnrichment.whileYouWereAway && (
+                <div>
+                  <p className="text-xs font-bold text-ink-muted uppercase tracking-wide mb-1">
+                    While you were away
+                  </p>
+                  <p className="text-sm text-ink leading-snug">{aiEnrichment.whileYouWereAway}</p>
+                </div>
+              )}
+
+              {/* What changed */}
+              {aiEnrichment.whatChanged.length > 0 && (
+                <div>
+                  <p className="text-xs font-bold text-ink-muted uppercase tracking-wide mb-1">
+                    What changed
+                  </p>
+                  <ul className="space-y-1">
+                    {aiEnrichment.whatChanged.map((c, i) => (
+                      <li key={i} className="text-sm text-ink-soft flex items-start gap-2">
+                        <span className="text-sticky-blue flex-shrink-0">→</span>
+                        {c}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {/* Needs attention */}
+              {aiEnrichment.whatNeedsAttention.length > 0 && (
+                <div>
+                  <p className="text-xs font-bold text-ink-muted uppercase tracking-wide mb-1 flex items-center gap-1">
+                    <AlertTriangle className="w-3 h-3 text-sticky-orange" /> Needs attention
+                  </p>
+                  <ul className="space-y-1">
+                    {aiEnrichment.whatNeedsAttention.map((a, i) => (
+                      <li key={i} className="text-sm text-ink-soft flex items-start gap-2">
+                        <span className="text-sticky-orange flex-shrink-0">!</span>
+                        {a}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {/* Your next step */}
+              {aiEnrichment.yourNextStep && (
+                <div className="bg-sticky-yellow/20 border border-sticky-yellow/40 rounded-card px-3 py-2">
+                  <p className="text-xs font-bold text-ink-muted uppercase tracking-wide mb-0.5">
+                    Your next step
+                  </p>
+                  <p className="text-sm font-semibold text-ink">{aiEnrichment.yourNextStep}</p>
+                </div>
+              )}
+
+              {aiEnrichment.isFallback && (
+                <p className="text-xs text-ink-faint italic">
+                  AI unavailable — showing GitHub-derived suggestions.
+                </p>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
       {/* ── Bottom CTAs ──────────────────────────────────────── */}
       <div className="flex flex-wrap gap-3">
         <Link to={`/projects/${projectId}/memos/new`} className="btn-end-session">
           <Plus className="w-5 h-5" />
           End Session
         </Link>
-        <Link to={`/projects/${projectId}/kanban`} className="btn-secondary">
+        <Link to={`/projects/${projectId}/intelligence`} className="btn-secondary">
+          <Brain className="w-4 h-4" />
+          Full Analysis
+        </Link>
+        <Link to={`/projects/${projectId}/kanban`} className="btn-ghost">
           View Kanban
         </Link>
         <Link to={`/projects/${projectId}`} className="btn-ghost">

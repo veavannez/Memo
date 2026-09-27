@@ -11,7 +11,7 @@ class Settings(BaseSettings):
     )
 
     # Database
-    DATABASE_URL: str = "postgresql+asyncpg://postgres:password@localhost:5432/memo"
+    DATABASE_URL: str = "sqlite+aiosqlite:///./memo.db"
 
     # Security
     SECRET_KEY: str = "dev-secret-key-change-in-production"
@@ -27,10 +27,17 @@ class Settings(BaseSettings):
     GITHUB_APP_WEBHOOK_SECRET: str = "dev-webhook-secret"
     GITHUB_APP_SLUG: str = "memo-app"
 
+    # IBM watsonx.ai
+    WATSONX_API_KEY: str = ""
+    WATSONX_PROJECT_ID: str = ""
+    WATSONX_URL: str = "https://us-south.ml.cloud.ibm.com"
+    # Model ID to use for analysis — defaults to IBM granite-3-8b-instruct
+    WATSONX_MODEL_ID: str = "ibm/granite-3-8b-instruct"
+
     # URLs
     FRONTEND_URL: str = "http://localhost:5173"
     BACKEND_URL: str = "http://localhost:8000"
-    ALLOWED_ORIGINS: str = "http://localhost:5173"
+    ALLOWED_ORIGINS: str = "http://localhost:5173,http://127.0.0.1:5173"
 
     @property
     def cors_origins(self) -> list[str]:

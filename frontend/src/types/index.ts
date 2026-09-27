@@ -246,6 +246,94 @@ export interface ProjectContext {
   error?: string;
 }
 
+// ─── watsonx.ai Intelligence Types ───────────────────────────────────────────
+
+export interface EvidencedItem {
+  title: string;
+  evidence: string[];
+  confidence: number;
+  reason?: string;
+}
+
+export interface DetectedGap {
+  id?: number;
+  category: 'TESTING' | 'IMPLEMENTATION' | 'INTEGRATION' | 'DOCUMENTATION' | 'ERROR HANDLING' | 'SECURITY' | 'UI' | 'BACKEND' | 'FRONTEND' | 'DEPLOYMENT';
+  title: string;
+  description: string;
+  reason: string;
+  confidence: number;
+  evidence: string[];
+  status: 'active' | 'dismissed' | 'created';
+  created_task_id?: number;
+}
+
+export interface SuggestedNextStep {
+  title: string;
+  description: string;
+  confidence: number;
+  evidence: string[];
+}
+
+export interface ProjectState {
+  completed: EvidencedItem[];
+  inProgress: EvidencedItem[];
+  blocked: EvidencedItem[];
+}
+
+export interface ProjectAnalysis {
+  projectState: ProjectState;
+  detectedGaps: DetectedGap[];
+  suggestedNextSteps: SuggestedNextStep[];
+  generatedAt: string;
+  modelId: string;
+  isFallback: boolean;
+  aiAvailable: boolean;
+}
+
+export interface GeneratedMemoContent {
+  completed?: string;
+  in_progress?: string;
+  blocked?: string;
+  next_steps?: string;
+  notes?: string;
+  generatedAt: string;
+  isFallback: boolean;
+}
+
+export interface CatchUpAIEnrichment {
+  whileYouWereAway: string;
+  whatChanged: string[];
+  whatNeedsAttention: string[];
+  yourNextStep: string;
+  confidence: number;
+  generatedAt: string;
+  isFallback: boolean;
+}
+
+export interface TaskAssignmentSuggestion {
+  task_id: number | string;
+  suggested_assignee?: string;
+  reason: string;
+  confidence: number;
+  evidence: string[];
+}
+
+export interface WatsonxStatus {
+  available: boolean;
+  model_id: string;
+  project_id_set: boolean;
+  api_key_set: boolean;
+}
+
+/** Confidence label helper */
+export type ConfidenceLevel = 'HIGH' | 'MEDIUM' | 'LOW';
+
+export function confidenceLevel(score: number): ConfidenceLevel {
+  if (score >= 0.75) return 'HIGH';
+  if (score >= 0.45) return 'MEDIUM';
+  return 'LOW';
+}
+
 /** A single unified activity item for the MEMO feed */
 export type ActivityItemKind = 'commit' | 'pull_request' | 'issue' | 'branch';
 

@@ -5,7 +5,7 @@ from typing import Optional
 from fastapi import Depends, HTTPException, status, Cookie
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlmodel.ext.asyncio.session import AsyncSession
-from sqlalchemy import select
+from sqlmodel import select
 
 from app.core.security import decode_token
 from app.core.database import get_session

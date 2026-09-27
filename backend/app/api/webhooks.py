@@ -7,7 +7,7 @@ from datetime import datetime, timezone
 
 from fastapi import APIRouter, Request, HTTPException, Depends, Header
 from sqlmodel.ext.asyncio.session import AsyncSession
-from sqlalchemy import select
+from sqlmodel import select
 from sqlalchemy.exc import IntegrityError
 
 from app.core.database import get_session

@@ -1,22 +1,14 @@
-# Environment variables
-.env
-.env.*
-!.env.example
+# Secrets
+backend/.env
+backend/*.pem
 
-# Dependencies
-node_modules/
+# Local databases
+backend/memo.db
+backend/memo_dev.db
+
+# Logs
+*.log
+
+# Python generated files
 __pycache__/
-*.pyc
-
-# Build files
-dist/
-build/
-.next/
-
-# Python
-.venv/
-venv/
-
-# IDE
-.vscode/
-.idea/
+*.py[cod]
