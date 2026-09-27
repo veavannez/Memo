@@ -1,12 +1,10 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import api from '../lib/api';
-import { DEMO_PROJECT, DEMO_MEMBERS, isDemoMode } from '../lib/demo';
-import type { Project, Repository } from '../types';
+import { DEMO_PROJECT, isDemoMode } from '../lib/demo';
+import type { Project } from '../types';
 import { Plus, GitBranch, Lock, Globe, ArrowRight, FlaskConical, Zap } from 'lucide-react';
-import { timeAgo } from '../lib/utils';
-import toast from 'react-hot-toast';
 
 // ─── Demo project card ────────────────────────────────────────────────────────
 function DemoProjectCard({ onClick }: { onClick: () => void }) {
@@ -44,11 +42,6 @@ function DemoProjectCard({ onClick }: { onClick: () => void }) {
 
 export default function ProjectsPage() {
   const navigate = useNavigate();
-  const queryClient = useQueryClient();
-  const [showCreate, setShowCreate] = useState(false);
-  const [selectedRepo, setSelectedRepo] = useState<Repository | null>(null);
-  const [projectName, setProjectName] = useState('');
-  const [projectDesc, setProjectDesc] = useState('');
 
   const isDemo = isDemoMode();
 
@@ -89,7 +82,7 @@ export default function ProjectsPage() {
           <p className="text-sm text-ink-muted">Connect a GitHub repository and start leaving memos.</p>
         </div>
         {!isDemo && (
-          <button className="btn-primary" onClick={() => setShowCreate(true)}>
+          <button className="btn-primary" onClick={() => navigate('/projects/new')}>
             <Plus className="w-4 h-4" />
             New Project
           </button>
@@ -114,7 +107,7 @@ export default function ProjectsPage() {
             <p className="text-ink-muted text-sm mb-6 max-w-xs">
               Connect a GitHub repository to start tracking your team's sessions with structured memos.
             </p>
-            <button className="btn-primary" onClick={() => setShowCreate(true)}>
+            <button className="btn-primary" onClick={() => navigate('/projects/new')}>
               <Plus className="w-4 h-4" />
               Create your first project
             </button>
@@ -168,67 +161,6 @@ export default function ProjectsPage() {
                 Connect a GitHub repository → End each coding session with a structured memo → Convert next steps to tasks → Use <strong>Catch Me Up</strong> when you return.
               </p>
             </div>
-          </div>
-        </div>
-      )}
-
-      {/* Create project modal */}
-      {showCreate && !isDemo && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-          <div className="card-editorial w-full max-w-lg p-6">
-            <h2 className="text-xl font-bold text-ink mb-1">Create Project</h2>
-            <p className="text-sm text-ink-muted mb-5">Connect a GitHub repository to get started.</p>
-            <form
-              onSubmit={(e) => {
-                e.preventDefault();
-                if (!projectName.trim()) return;
-                // Without a real repo selected, prompt to install GitHub App
-                toast.error('Please install the MEMO GitHub App and select a repository.');
-              }}
-              className="space-y-4"
-            >
-              <div>
-                <label className="label">Project Name</label>
-                <input
-                  className="input"
-                  value={projectName}
-                  onChange={(e) => setProjectName(e.target.value)}
-                  placeholder="e.g. Auth Service"
-                  required
-                />
-              </div>
-              <div>
-                <label className="label">Description <span className="text-ink-faint font-normal normal-case tracking-normal">(optional)</span></label>
-                <input
-                  className="input"
-                  value={projectDesc}
-                  onChange={(e) => setProjectDesc(e.target.value)}
-                  placeholder="Brief description…"
-                />
-              </div>
-              <div className="card p-4 border-dashed">
-                <p className="text-xs font-bold text-ink mb-2">GitHub Repository</p>
-                <p className="text-xs text-ink-muted mb-3">
-                  Install the MEMO GitHub App on your account or organisation to select a repository.
-                </p>
-                <a
-                  href={`https://github.com/apps/${import.meta.env.VITE_GITHUB_APP_SLUG || 'memo-workspace'}/installations/new`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="btn-secondary text-xs px-3 py-1.5 inline-flex"
-                >
-                  Install GitHub App →
-                </a>
-              </div>
-              <div className="flex gap-2 justify-end pt-2">
-                <button type="button" className="btn-ghost" onClick={() => setShowCreate(false)}>
-                  Cancel
-                </button>
-                <button type="submit" className="btn-primary" disabled={!projectName.trim()}>
-                  Create Project
-                </button>
-              </div>
-            </form>
           </div>
         </div>
       )}

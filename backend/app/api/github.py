@@ -1,8 +1,8 @@
 """
-GitHub integration routes — installations and repositories.
+GitHub integration routes — installations, repositories, and project context.
 """
-from typing import List
-from fastapi import APIRouter, Depends, HTTPException, status
+from typing import List, Optional, Any, Dict
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlmodel.ext.asyncio.session import AsyncSession
 from sqlalchemy import select
 from datetime import datetime, timezone
@@ -11,6 +11,7 @@ from app.core.database import get_session
 from app.models.models import User, GitHubAccount, GitHubInstallation, Repository
 from app.schemas.schemas import InstallationRead, RepositoryRead
 from app.services import github_service
+from app.services.github_normalizer import build_project_context
 from app.api.deps import get_current_user
 
 router = APIRouter(prefix="/github", tags=["github"])
@@ -129,3 +130,129 @@ async def list_installation_repositories(
     for r in results:
         await session.refresh(r)
     return results
+
+
+# ─── Repository metadata ──────────────────────────────────────────────────────
+
+@router.get("/repos/{owner}/{repo}/metadata")
+async def get_repo_metadata(
+    owner: str,
+    repo: str,
+    current_user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+):
+    """
+    Return enriched repository metadata (description, language, stars, etc.)
+    from GitHub. Requires the MEMO GitHub App to be installed on the account.
+    """
+    full_name = f"{owner}/{repo}"
+    # Find the installation record for this repo
+    repo_result = await session.exec(
+        select(Repository).where(Repository.full_name == full_name)
+    )
+    db_repo = repo_result.first()
+    if not db_repo:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Repository {full_name} not found. Install the MEMO GitHub App first.",
+        )
+
+    # Get the installation
+    inst_result = await session.exec(
+        select(GitHubInstallation).where(GitHubInstallation.id == db_repo.installation_id)
+    )
+    db_inst = inst_result.first()
+    if not db_inst:
+        raise HTTPException(status_code=404, detail="Installation not found")
+
+    meta = await github_service.get_repository_metadata(db_inst.installation_id, full_name)
+    if not meta:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Could not fetch repository metadata from GitHub. Check installation permissions.",
+        )
+    return meta
+
+
+# ─── Project context collection ───────────────────────────────────────────────
+
+@router.get("/repos/{owner}/{repo}/context")
+async def get_project_context(
+    owner: str,
+    repo: str,
+    branch: Optional[str] = Query(default=None, description="Branch to collect context for. Defaults to default branch."),
+    current_user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+):
+    """
+    Collect and normalise the full project context for a repository.
+
+    Returns a ProjectContext object containing:
+    - Repository metadata
+    - Recent commits with diff stats
+    - Open pull requests with file lists
+    - Open issues
+    - Branches
+    - Recent file changes
+    - Contributors
+
+    Requires the MEMO GitHub App to be installed on the repository.
+    """
+    full_name = f"{owner}/{repo}"
+
+    # Resolve the DB repo + installation
+    repo_result = await session.exec(
+        select(Repository).where(Repository.full_name == full_name)
+    )
+    db_repo = repo_result.first()
+    if not db_repo:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Repository {full_name} not found in MEMO. "
+                   "Install the GitHub App and sync the repository first.",
+        )
+
+    inst_result = await session.exec(
+        select(GitHubInstallation).where(GitHubInstallation.id == db_repo.installation_id)
+    )
+    db_inst = inst_result.first()
+    if not db_inst or not db_inst.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="GitHub App installation is inactive or not found. Please reinstall.",
+        )
+
+    installation_id = db_inst.installation_id
+    active_branch = branch or db_repo.default_branch
+
+    # Collect data in parallel where possible — sequential here for simplicity
+    # (could be asyncio.gather in future)
+    repo_meta = await github_service.get_repository_metadata(installation_id, full_name)
+    if not repo_meta:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="GitHub API unreachable or installation token expired. Try reinstalling the GitHub App.",
+        )
+
+    commits = await github_service.get_commits_with_stats(
+        installation_id, full_name, branch=active_branch, max_results=20
+    )
+    pull_requests = await github_service.get_pull_requests_with_files(
+        installation_id, full_name, state="open", max_results=15
+    )
+    issues = await github_service.get_issues_with_comments(
+        installation_id, full_name, state="open", max_results=20
+    )
+    branches = await github_service.get_branches(installation_id, full_name, max_results=30)
+    contributors = await github_service.get_contributors(installation_id, full_name, max_results=20)
+
+    context = build_project_context(
+        repo_meta=repo_meta,
+        commits=commits,
+        pull_requests=pull_requests,
+        issues=issues,
+        branches=branches,
+        contributors=contributors,
+        active_branch=active_branch,
+    )
+    return context

@@ -1,12 +1,19 @@
 """
 GitHub App service — handles GitHub API calls using installation tokens.
-Uses PyGithub for convenience and httpx for direct calls where needed.
+
+Two access patterns:
+  • Installation token  — used after GitHub App is installed on an account.
+    All repo-level data collection uses this path.
+  • OAuth user token    — used during the OAuth callback to identify the user.
+
+Data normalisation happens in github_normalizer.py; this module only handles
+raw HTTP calls and token management.
 """
 import time
 import json
 import hashlib
 import hmac
-from typing import Optional, List
+from typing import Optional, List, Dict, Any
 from datetime import datetime, timezone, timedelta
 
 import httpx
@@ -219,6 +226,227 @@ async def get_user_by_login(installation_id: int, login: str) -> Optional[dict]:
         if resp.status_code == 200:
             return resp.json()
     return None
+
+
+# ─── Extended data collection ─────────────────────────────────────────────────
+
+async def get_repository_metadata(installation_id: int, repo_full_name: str) -> Optional[Dict[str, Any]]:
+    """Fetch full repository metadata including language, description, stars."""
+    token = await get_installation_token(installation_id)
+    if not token:
+        return None
+    async with httpx.AsyncClient() as client:
+        resp = await client.get(
+            f"https://api.github.com/repos/{repo_full_name}",
+            headers={
+                "Authorization": f"token {token}",
+                "Accept": "application/vnd.github+json",
+                "X-GitHub-Api-Version": "2022-11-28",
+            },
+        )
+        if resp.status_code == 200:
+            return resp.json()
+    return None
+
+
+async def get_commit_detail(
+    installation_id: int,
+    repo_full_name: str,
+    sha: str,
+) -> Optional[Dict[str, Any]]:
+    """Fetch a single commit with file-level diff stats."""
+    token = await get_installation_token(installation_id)
+    if not token:
+        return None
+    async with httpx.AsyncClient(timeout=15.0) as client:
+        resp = await client.get(
+            f"https://api.github.com/repos/{repo_full_name}/commits/{sha}",
+            headers={
+                "Authorization": f"token {token}",
+                "Accept": "application/vnd.github+json",
+                "X-GitHub-Api-Version": "2022-11-28",
+            },
+        )
+        if resp.status_code == 200:
+            return resp.json()
+    return None
+
+
+async def get_commits_with_stats(
+    installation_id: int,
+    repo_full_name: str,
+    branch: Optional[str] = None,
+    since: Optional[datetime] = None,
+    max_results: int = 20,
+) -> List[Dict[str, Any]]:
+    """
+    Fetch recent commits and enrich each with diff stats.
+    Fetches the commit list first, then enriches the top N with file-level stats.
+    """
+    token = await get_installation_token(installation_id)
+    if not token:
+        return []
+
+    params: Dict[str, Any] = {"per_page": max_results}
+    if branch:
+        params["sha"] = branch
+    if since:
+        params["since"] = since.isoformat()
+
+    async with httpx.AsyncClient(timeout=20.0) as client:
+        list_resp = await client.get(
+            f"https://api.github.com/repos/{repo_full_name}/commits",
+            headers={
+                "Authorization": f"token {token}",
+                "Accept": "application/vnd.github+json",
+                "X-GitHub-Api-Version": "2022-11-28",
+            },
+            params=params,
+        )
+        if list_resp.status_code != 200:
+            return []
+        commits = list_resp.json()
+
+        # Enrich top 10 with file stats (avoid excessive API calls)
+        enriched = []
+        for commit in commits[:10]:
+            sha = commit["sha"]
+            detail_resp = await client.get(
+                f"https://api.github.com/repos/{repo_full_name}/commits/{sha}",
+                headers={
+                    "Authorization": f"token {token}",
+                    "Accept": "application/vnd.github+json",
+                    "X-GitHub-Api-Version": "2022-11-28",
+                },
+            )
+            if detail_resp.status_code == 200:
+                enriched.append(detail_resp.json())
+            else:
+                enriched.append(commit)
+
+        # Remaining commits without detail
+        enriched.extend(commits[10:])
+        return enriched
+
+
+async def get_pull_requests_with_files(
+    installation_id: int,
+    repo_full_name: str,
+    state: str = "open",
+    max_results: int = 15,
+) -> List[Dict[str, Any]]:
+    """Fetch pull requests and enrich each with changed-file lists."""
+    token = await get_installation_token(installation_id)
+    if not token:
+        return []
+
+    async with httpx.AsyncClient(timeout=20.0) as client:
+        pr_resp = await client.get(
+            f"https://api.github.com/repos/{repo_full_name}/pulls",
+            headers={
+                "Authorization": f"token {token}",
+                "Accept": "application/vnd.github+json",
+                "X-GitHub-Api-Version": "2022-11-28",
+            },
+            params={"state": state, "per_page": max_results, "sort": "updated"},
+        )
+        if pr_resp.status_code != 200:
+            return []
+        prs = pr_resp.json()
+
+        # Enrich each PR with file list (top 10 only)
+        enriched = []
+        for pr in prs[:10]:
+            pr_num = pr["number"]
+            files_resp = await client.get(
+                f"https://api.github.com/repos/{repo_full_name}/pulls/{pr_num}/files",
+                headers={
+                    "Authorization": f"token {token}",
+                    "Accept": "application/vnd.github+json",
+                    "X-GitHub-Api-Version": "2022-11-28",
+                },
+                params={"per_page": 100},
+            )
+            if files_resp.status_code == 200:
+                pr["_files"] = files_resp.json()
+            enriched.append(pr)
+
+        enriched.extend(prs[10:])
+        return enriched
+
+
+async def get_branches(
+    installation_id: int,
+    repo_full_name: str,
+    max_results: int = 30,
+) -> List[Dict[str, Any]]:
+    """Fetch repository branches with latest commit info."""
+    token = await get_installation_token(installation_id)
+    if not token:
+        return []
+    async with httpx.AsyncClient(timeout=15.0) as client:
+        resp = await client.get(
+            f"https://api.github.com/repos/{repo_full_name}/branches",
+            headers={
+                "Authorization": f"token {token}",
+                "Accept": "application/vnd.github+json",
+                "X-GitHub-Api-Version": "2022-11-28",
+            },
+            params={"per_page": max_results, "protected": "false"},
+        )
+        if resp.status_code == 200:
+            return resp.json()
+    return []
+
+
+async def get_issues_with_comments(
+    installation_id: int,
+    repo_full_name: str,
+    state: str = "open",
+    max_results: int = 20,
+) -> List[Dict[str, Any]]:
+    """Fetch issues (excluding PRs) sorted by recent update."""
+    token = await get_installation_token(installation_id)
+    if not token:
+        return []
+    async with httpx.AsyncClient(timeout=15.0) as client:
+        resp = await client.get(
+            f"https://api.github.com/repos/{repo_full_name}/issues",
+            headers={
+                "Authorization": f"token {token}",
+                "Accept": "application/vnd.github+json",
+                "X-GitHub-Api-Version": "2022-11-28",
+            },
+            params={"state": state, "per_page": max_results, "sort": "updated"},
+        )
+        if resp.status_code == 200:
+            # Filter out PRs (GitHub issues endpoint includes PRs)
+            return [i for i in resp.json() if "pull_request" not in i]
+    return []
+
+
+async def get_contributors(
+    installation_id: int,
+    repo_full_name: str,
+    max_results: int = 20,
+) -> List[Dict[str, Any]]:
+    """Fetch top contributors for a repository."""
+    token = await get_installation_token(installation_id)
+    if not token:
+        return []
+    async with httpx.AsyncClient(timeout=15.0) as client:
+        resp = await client.get(
+            f"https://api.github.com/repos/{repo_full_name}/contributors",
+            headers={
+                "Authorization": f"token {token}",
+                "Accept": "application/vnd.github+json",
+                "X-GitHub-Api-Version": "2022-11-28",
+            },
+            params={"per_page": max_results},
+        )
+        if resp.status_code == 200:
+            return resp.json()
+    return []
 
 
 def verify_webhook_signature(payload: bytes, signature_header: Optional[str]) -> bool:

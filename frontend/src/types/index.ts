@@ -142,3 +142,121 @@ export interface TokenResponse {
   token_type: string;
   user: User;
 }
+
+// ─── GitHub normalized types ──────────────────────────────────────────────────
+
+export interface NormalizedCommit {
+  sha: string;
+  shortSha: string;
+  message: string;
+  author: string;
+  authorAvatar?: string;
+  timestamp: string;
+  branch?: string;
+  additions: number;
+  deletions: number;
+  changedFiles: string[];
+  url: string;
+}
+
+export interface NormalizedPullRequest {
+  number: number;
+  title: string;
+  description?: string;
+  author: string;
+  authorAvatar?: string;
+  state: 'open' | 'closed' | 'merged';
+  reviewers: string[];
+  labels: string[];
+  createdAt: string;
+  updatedAt: string;
+  mergedAt?: string;
+  changedFiles: string[];
+  additions: number;
+  deletions: number;
+  linkedIssues: number[];
+  url: string;
+  isDraft: boolean;
+}
+
+export interface NormalizedIssue {
+  number: number;
+  title: string;
+  description?: string;
+  state: 'open' | 'closed';
+  labels: string[];
+  assignee?: string;
+  author: string;
+  createdAt: string;
+  updatedAt: string;
+  closedAt?: string;
+  commentsCount: number;
+  url: string;
+}
+
+export interface NormalizedBranch {
+  name: string;
+  latestCommitSha: string;
+  latestCommitMessage: string;
+  isProtected: boolean;
+  isDefault: boolean;
+  updatedAt?: string;
+}
+
+export interface NormalizedFileChange {
+  path: string;
+  status: 'added' | 'modified' | 'removed' | 'renamed';
+  additions: number;
+  deletions: number;
+}
+
+export interface RepositoryMetadata {
+  fullName: string;
+  name: string;
+  owner: string;
+  description?: string;
+  language?: string;
+  isPrivate: boolean;
+  defaultBranch: string;
+  updatedAt: string;
+  starCount: number;
+  openIssuesCount: number;
+  url: string;
+}
+
+/** Normalized project context — the canonical shape consumed by watsonx and UI. */
+export interface ProjectContext {
+  repository: RepositoryMetadata;
+  activeBranch: string;
+  recentCommits: NormalizedCommit[];
+  openPullRequests: NormalizedPullRequest[];
+  openIssues: NormalizedIssue[];
+  recentFileChanges: NormalizedFileChange[];
+  branches: NormalizedBranch[];
+  contributors: string[];
+  projectMetadata: {
+    totalCommits: number;
+    openPRCount: number;
+    openIssueCount: number;
+    activeBranchCount: number;
+  };
+  collectedAt: string;
+  /** Present when GitHub credentials were unavailable — data is mock */
+  isMock?: boolean;
+  error?: string;
+}
+
+/** A single unified activity item for the MEMO feed */
+export type ActivityItemKind = 'commit' | 'pull_request' | 'issue' | 'branch';
+
+export interface ActivityItem {
+  id: string;
+  kind: ActivityItemKind;
+  title: string;
+  subtitle?: string;
+  actor: string;
+  actorAvatar?: string;
+  timestamp: string;
+  url: string;
+  meta?: Record<string, string | number | boolean>;
+}
