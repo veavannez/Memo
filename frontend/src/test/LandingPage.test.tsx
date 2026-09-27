@@ -43,8 +43,9 @@ describe('LandingPage', () => {
 
   it('renders feature cards', () => {
     wrap(<LandingPage />);
-    expect(screen.getByText('Create Memos')).toBeInTheDocument();
-    expect(screen.getByText('Team Dashboard')).toBeInTheDocument();
+    expect(screen.getByText('End Session')).toBeInTheDocument();
+    expect(screen.getByText('Create Tasks')).toBeInTheDocument();
+    expect(screen.getByText('Kanban Board')).toBeInTheDocument();
     expect(screen.getByText('Catch Me Up')).toBeInTheDocument();
   });
 });

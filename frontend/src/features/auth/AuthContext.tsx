@@ -1,4 +1,5 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { createContext, useContext, useState, useEffect } from 'react';
+import type { ReactNode } from 'react';
 import type { User } from '../../types';
 import api from '../../lib/api';
 import { DEMO_USER, activateDemoMode, deactivateDemoMode, isDemoMode } from '../../lib/demo';

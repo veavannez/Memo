@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
   AlertTriangle, GitCommit, GitPullRequest, ChevronRight,
@@ -339,7 +339,7 @@ function ScreenTasks({ onNav }: { onNav: (s: string) => void }) {
   );
 }
 
-function ScreenKanban({ onNav }: { onNav: (s: string) => void }) {
+function ScreenKanban({ onNav: _onNav }: { onNav: (s: string) => void }) {
   const cols: { key: string; label: string; cls: string; badgeCls: string }[] = [
     { key: 'todo', label: 'To Do', cls: 'bg-gray-50', badgeCls: 'bg-gray-200 text-gray-600' },
     { key: 'in_progress', label: 'In Progress', cls: 'bg-blue-50', badgeCls: 'bg-blue-100 text-blue-700' },

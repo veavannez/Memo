@@ -25,6 +25,8 @@ import type {
   ConfidenceLevel,
   DetectedGap,
   Task,
+  GapTaskSuggestion,
+  ProjectRefreshResponse, AutomationMode,
 } from '../types';
 
 export { confidenceLevel } from '../types';
@@ -76,9 +78,11 @@ export async function detectGaps(
  */
 export async function generateMemoDraft(
   projectId: string | number,
+  manual: { completed?: string; in_progress?: string; blocked?: string; next_steps?: string; notes?: string },
 ): Promise<GeneratedMemoContent> {
   const { data } = await api.post<GeneratedMemoContent>(
     `/projects/${projectId}/intelligence/generate-memo`,
+    manual,
   );
   return data;
 }
@@ -126,10 +130,26 @@ export async function dismissDetectedGap(projectId: string | number, gapId: numb
   await api.post(`/projects/${projectId}/intelligence/gaps/${gapId}/dismiss`);
 }
 
+export async function getGapTaskSuggestion(
+  projectId: string | number,
+  gapId: number,
+): Promise<GapTaskSuggestion> {
+  const { data } = await api.get<GapTaskSuggestion>(`/projects/${projectId}/intelligence/gaps/${gapId}/task-suggestion`);
+  return data;
+}
+
 export async function createTaskFromGap(
   projectId: string | number,
   gapId: number,
-  draft: { title: string; description: string; priority: 'low' | 'medium' | 'high' },
+  draft: {
+    title: string;
+    description: string;
+    priority: 'low' | 'medium' | 'high';
+    status: 'todo' | 'in_progress' | 'blocked' | 'done';
+    assignee_id?: number;
+    assignment_reason?: string;
+    assignment_confidence?: number;
+  },
 ): Promise<Task> {
   const { data } = await api.post<Task>(`/projects/${projectId}/intelligence/gaps/${gapId}/task`, draft);
   return data;
@@ -155,4 +175,22 @@ export function aiPrefix(score: number): string {
 export function formatModelId(modelId: string): string {
   if (modelId === 'fallback') return 'Fallback (no AI)';
   return modelId;
+}
+
+export async function refreshProjectIntelligence(projectId: string | number): Promise<ProjectRefreshResponse> {
+  const { data } = await api.post<ProjectRefreshResponse>(`/projects/${projectId}/intelligence/refresh`);
+  return data;
+}
+
+export async function setAutomationMode(projectId: string | number, mode: AutomationMode): Promise<void> {
+  await api.patch(`/projects/${projectId}/intelligence/automation-mode`, { mode });
+}
+
+export async function approveTaskUpdate(projectId: string | number, proposalId: number): Promise<Task> {
+  const { data } = await api.post<Task>(`/projects/${projectId}/intelligence/task-proposals/${proposalId}/approve`);
+  return data;
+}
+
+export async function dismissTaskUpdate(projectId: string | number, proposalId: number): Promise<void> {
+  await api.post(`/projects/${projectId}/intelligence/task-proposals/${proposalId}/dismiss`);
 }

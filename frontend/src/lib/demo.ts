@@ -312,7 +312,21 @@ export const DEMO_CATCH_ME_UP: CatchMeUp = {
     'Priya and Jordan both left memos since your last session.',
     'PR #47 (Google OAuth2) has been merged and needs staging deployment.',
     'Integration tests are still failing — fix before end of day.',
+  ],  briefing_summary: '4 meaningful changes across 3 contributors.',
+  what_changed: [
+    { title: 'Authentication PR merged', detail: 'Google OAuth2 support landed on main.', tone: 'positive', evidence: [{ type: 'pull_request', label: 'PR #47', url: 'https://github.com/alexrivera/auth-service/pull/47' }] },
+    { title: 'Integration tests updated', detail: 'Authentication coverage changed with the new token flow.', tone: 'neutral', evidence: [{ type: 'file', label: 'tests/integration/auth.test.ts' }] },
+    { title: 'Frontend session handling updated', detail: 'The AuthProvider now consumes the refreshed session.', tone: 'neutral', evidence: [{ type: 'file', label: 'src/components/AuthProvider.tsx' }] },
   ],
+  team_activity: [
+    { name: 'Priya Shah', login: 'priyashah', summary: 'Working on frontend authentication', evidence: [{ type: 'file', label: 'src/components/AuthProvider.tsx' }] },
+    { name: 'Alex Rivera', login: 'alexrivera', summary: 'Completed backend token flow', evidence: [{ type: 'pull_request', label: 'PR #47', url: 'https://github.com/alexrivera/auth-service/pull/47' }] },
+    { name: 'Jamie Chen', login: 'jamiechen', summary: 'Updated integration tests', evidence: [{ type: 'file', label: 'tests/integration/auth.test.ts' }] },
+  ],
+  attention_items: [{ title: 'OAuth callback', detail: 'The callback still appears unresolved in staging.', tone: 'warning', evidence: [{ type: 'issue', label: 'Issue #52', url: 'https://github.com/alexrivera/auth-service/issues/52' }] }],
+  next_step: { title: 'Review the updated authentication flow', detail: 'Connect and verify the frontend session refresh.', tone: 'neutral', evidence: [{ type: 'pull_request', label: 'PR #47', url: 'https://github.com/alexrivera/auth-service/pull/47' }, { type: 'file', label: 'src/components/AuthProvider.tsx' }] },
+  compared_from: '2024-03-17T09:00:00Z',
+  generated_at: '2024-03-18T11:00:00Z',
 };
 
 // ─── Helper ───────────────────────────────────────────────────────────────────

@@ -80,11 +80,11 @@ export interface Memo {
   project_id: number;
   author_id: number;
   author?: User;
-  completed?: string;
-  in_progress?: string;
-  blocked?: string;
-  next_steps?: string;
-  notes?: string;
+  completed?: string | null;
+  in_progress?: string | null;
+  blocked?: string | null;
+  next_steps?: string | null;
+  notes?: string | null;
   is_draft: boolean;
   github_activities: GitHubActivity[];
   created_at: string;
@@ -105,6 +105,12 @@ export interface Task {
   status: TaskStatus;
   priority: TaskPriority;
   github_issue_url?: string;
+  source_type?: string;
+  source_gap_id?: number;
+  source_evidence?: string[];
+  ai_generated?: boolean;
+  assignment_reason?: string;
+  assignment_confidence?: number;
   position: number;
   created_at: string;
   updated_at: string;
@@ -126,6 +132,25 @@ export interface Dashboard {
   recent_tasks: Task[];
 }
 
+export interface BriefingEvidence {
+  type: 'commit' | 'pull_request' | 'issue' | 'file' | 'task' | 'memo' | string;
+  label: string;
+  url?: string;
+}
+
+export interface BriefingItem {
+  title: string;
+  detail?: string;
+  tone: 'positive' | 'warning' | 'neutral';
+  evidence: BriefingEvidence[];
+}
+
+export interface TeamBriefing {
+  name: string;
+  login?: string;
+  summary: string;
+  evidence: BriefingEvidence[];
+}
 export interface CatchMeUp {
   user: User;
   last_session_memo?: Memo;
@@ -135,6 +160,13 @@ export interface CatchMeUp {
   recent_github_activity: GitHubActivity[];
   suggested_next_steps: string[];
   summary_lines: string[];
+  briefing_summary?: string;
+  what_changed?: BriefingItem[];
+  team_activity?: TeamBriefing[];
+  attention_items?: BriefingItem[];
+  next_step?: BriefingItem;
+  compared_from?: string;
+  generated_at?: string;
 }
 
 export interface TokenResponse {
@@ -290,12 +322,42 @@ export interface ProjectAnalysis {
   aiAvailable: boolean;
 }
 
+export type AutomationMode = 'observe' | 'suggest' | 'autopilot';
+
+export interface IntelligenceChange {
+  kind: string;
+  title: string;
+  description: string;
+  evidence: string[];
+  tone: 'positive' | 'warning' | 'neutral';
+}
+
+export interface TaskUpdateProposal {
+  id: number;
+  task_id: number;
+  task_title: string;
+  proposed_status: TaskStatus;
+  reason: string;
+  evidence: string[];
+  confidence: number;
+  status: 'pending' | 'approved' | 'dismissed';
+}
+
+export interface ProjectRefreshResponse {
+  analysis: ProjectAnalysis;
+  changes: IntelligenceChange[];
+  taskProposals: TaskUpdateProposal[];
+  automationMode: AutomationMode;
+  previousSnapshotAt?: string;
+  refreshedAt: string;
+  baselineCreated: boolean;
+}
 export interface GeneratedMemoContent {
-  completed?: string;
-  in_progress?: string;
-  blocked?: string;
-  next_steps?: string;
-  notes?: string;
+  completed?: string | null;
+  in_progress?: string | null;
+  blocked?: string | null;
+  next_steps?: string | null;
+  notes?: string | null;
   generatedAt: string;
   isFallback: boolean;
 }
@@ -310,6 +372,20 @@ export interface CatchUpAIEnrichment {
   isFallback: boolean;
 }
 
+export interface GapTaskSuggestion {
+  title: string;
+  description: string;
+  priority: TaskPriority;
+  status: TaskStatus;
+  repository: string;
+  related_pr?: string;
+  evidence: string[];
+  suggested_owner_id?: number;
+  suggested_owner_name?: string;
+  suggested_owner_login?: string;
+  assignment_reason: string;
+  assignment_confidence: number;
+}
 export interface TaskAssignmentSuggestion {
   task_id: number | string;
   suggested_assignee?: string;

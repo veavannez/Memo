@@ -4,6 +4,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Toaster } from 'react-hot-toast';
 import { AuthProvider, useAuth } from './features/auth/AuthContext';
 import AppShell from './AppShell';
+import ErrorBoundary from './components/ErrorBoundary';
 
 // Pages
 import LandingPage from './pages/LandingPage';
@@ -78,13 +79,15 @@ function AppRoutes() {
 
 export default function App() {
   return (
-    <QueryClientProvider client={queryClient}>
+    <ErrorBoundary>
+      <QueryClientProvider client={queryClient}>
       <AuthProvider>
         <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
           <AppRoutes />
           <Toaster position="top-right" toastOptions={{ duration: 3000 }} />
         </BrowserRouter>
       </AuthProvider>
-    </QueryClientProvider>
+      </QueryClientProvider>
+    </ErrorBoundary>
   );
 }

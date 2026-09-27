@@ -1,7 +1,8 @@
 """
 Catch Me Up — deterministic aggregation of context for a returning developer.
 """
-from typing import List
+from typing import List, Dict, Any, Optional
+import json
 from datetime import datetime, timezone, timedelta
 
 from fastapi import APIRouter, Depends
@@ -10,7 +11,7 @@ from sqlmodel import select
 
 from app.core.database import get_session
 from app.models.models import (
-    User, Memo, Task, MemoGitHubActivity, GitHubAccount, ProjectMember, TaskStatus,
+    User, Memo, Task, MemoGitHubActivity, GitHubAccount, ProjectMember, TaskStatus, ProjectIntelligenceSnapshot, DetectedGapRecord,
 )
 from app.schemas.schemas import (
     CatchMeUpResponse, UserRead, MemoRead, TaskRead, MemoGitHubActivityRead,
@@ -146,6 +147,23 @@ async def catch_me_up(
         last_activity_time=last_activity_time,
     )
 
+    # Signature briefing: compare the two most recent persisted intelligence snapshots.
+    snapshots_result = await session.exec(
+        select(ProjectIntelligenceSnapshot)
+        .where(ProjectIntelligenceSnapshot.project_id == project_id)
+        .order_by(ProjectIntelligenceSnapshot.created_at.desc())
+        .limit(2)
+    )
+    snapshots = snapshots_result.all()
+    latest_snapshot = snapshots[0] if snapshots else None
+    previous_snapshot = snapshots[1] if len(snapshots) > 1 else None
+    briefing = _build_briefing(
+        project_id=project_id,
+        latest_snapshot=latest_snapshot,
+        previous_snapshot=previous_snapshot,
+        team_memos=team_memos_since_last,
+        blocked_tasks=my_blocked_tasks,
+    )
     return CatchMeUpResponse(
         user=user_read,
         last_session_memo=last_session_memo,
@@ -155,6 +173,13 @@ async def catch_me_up(
         recent_github_activity=recent_github_activity,
         suggested_next_steps=suggested_next_steps[:5],
         summary_lines=summary_lines,
+        briefing_summary=briefing["summary"],
+        what_changed=briefing["changes"],
+        team_activity=briefing["team"],
+        attention_items=briefing["attention"],
+        next_step=briefing["next_step"],
+        compared_from=briefing["compared_from"],
+        generated_at=datetime.now(timezone.utc).isoformat(),
     )
 
 
@@ -222,3 +247,69 @@ def _build_summary(
             lines.append(f"{pr_count} pull request{'s' if pr_count > 1 else ''} updated recently.")
 
     return lines
+
+
+def _evidence(value: str, default_type: str = "file") -> Dict[str, Optional[str]]:
+    value = str(value or "")
+    lower = value.lower()
+    evidence_type = "commit" if ":" in value and len(value.split(":", 1)[0]) <= 12 else default_type
+    if "/pull/" in lower: evidence_type = "pull_request"
+    elif "/issues/" in lower: evidence_type = "issue"
+    elif lower.startswith("task "): evidence_type = "task"
+    return {"type": evidence_type, "label": value, "url": value if value.startswith("http") or value.startswith("/") else None}
+
+
+def _build_briefing(project_id: int, latest_snapshot, previous_snapshot, team_memos, blocked_tasks) -> Dict[str, Any]:
+    if not latest_snapshot:
+        attention = [{"title": task.title, "detail": "This assigned task is blocked.", "tone": "warning", "evidence": [_evidence(f"Task {task.id}", "task")]} for task in blocked_tasks[:3]]
+        return {"summary": "MEMO needs one Project Intelligence update to establish your project baseline.", "changes": [], "team": [], "attention": attention, "next_step": {"title": "Update project intelligence", "detail": "Create a baseline from current GitHub activity, then return for a comparison briefing.", "tone": "neutral", "evidence": []}, "compared_from": None}
+
+    current = json.loads(latest_snapshot.context_json)
+    previous = json.loads(previous_snapshot.context_json) if previous_snapshot else None
+    from app.api.intelligence import _meaningful_changes
+    raw_changes = _meaningful_changes(previous, current)
+    changes = [{"title": item["title"], "detail": item["description"], "tone": item.get("tone", "neutral"), "evidence": [_evidence(e, item.get("kind", "file")) for e in item.get("evidence", []) if e]} for item in raw_changes]
+
+    previous_shas = {c.get("sha") for c in (previous or {}).get("recentCommits", [])}
+    new_commits = [c for c in current.get("recentCommits", []) if not previous or c.get("sha") not in previous_shas]
+    by_author: Dict[str, List[Dict[str, Any]]] = {}
+    for commit in new_commits:
+        by_author.setdefault(commit.get("author") or "Unknown contributor", []).append(commit)
+    team = []
+    for author, commits in list(by_author.items())[:5]:
+        files = list(dict.fromkeys(path for commit in commits for path in commit.get("changedFiles", [])))
+        summary = commits[0].get("message") or f"Added {len(commits)} commit(s)"
+        evidence = [_evidence(commit.get("url") or f"{commit.get('shortSha')}: {commit.get('message')}", "commit") for commit in commits[:3]]
+        evidence += [_evidence(path) for path in files[:2]]
+        team.append({"name": author, "login": author, "summary": summary, "evidence": evidence})
+    for memo in team_memos:
+        name = memo.author.display_name if memo.author else "Team member"
+        if not any(member["name"] == name for member in team):
+            team.append({"name": name, "summary": memo.in_progress or memo.completed or "Shared a project memo.", "evidence": [{"type": "memo", "label": f"Memo #{memo.id}", "url": f"/projects/{project_id}/memos/{memo.id}"}]})
+
+    try: analysis = json.loads(latest_snapshot.analysis_json)
+    except (TypeError, json.JSONDecodeError): analysis = {}
+    attention = []
+    for gap in analysis.get("detectedGaps", [])[:4]:
+        attention.append({"title": gap.get("title", "Potential gap"), "detail": gap.get("description"), "tone": "warning", "evidence": [_evidence(e) for e in gap.get("evidence", [])]})
+    for task in blocked_tasks[:3]:
+        if not any(item["title"] == task.title for item in attention):
+            attention.append({"title": task.title, "detail": "This assigned task is blocked.", "tone": "warning", "evidence": [{"type": "task", "label": f"Task {task.id}", "url": f"/projects/{project_id}/kanban"}]})
+
+    suggested = (analysis.get("suggestedNextSteps") or [{}])[0]
+    next_step = None
+    if suggested.get("title"):
+        next_step = {"title": suggested["title"], "detail": suggested.get("description"), "tone": "neutral", "evidence": [_evidence(e) for e in suggested.get("evidence", [])]}
+    elif attention:
+        next_step = {"title": f"Review: {attention[0]['title']}", "detail": attention[0].get("detail"), "tone": "neutral", "evidence": attention[0]["evidence"]}
+    elif blocked_tasks:
+        next_step = {"title": f"Unblock {blocked_tasks[0].title}", "detail": "Review the blocker and decide the next action.", "tone": "neutral", "evidence": [{"type": "task", "label": f"Task {blocked_tasks[0].id}", "url": f"/projects/{project_id}/kanban"}]}
+    else:
+        next_step = {"title": "Review the latest project activity", "detail": "No urgent attention item was detected.", "tone": "neutral", "evidence": []}
+
+    contributor_count = len(by_author)
+    if previous_snapshot:
+        summary = f"{len(changes)} meaningful change{'s' if len(changes) != 1 else ''} across {contributor_count} contributor{'s' if contributor_count != 1 else ''}."
+    else:
+        summary = f"Baseline context assembled from {len(current.get('recentCommits', []))} recent commits and {len(current.get('contributors', []))} contributors."
+    return {"summary": summary, "changes": changes, "team": team[:6], "attention": attention[:5], "next_step": next_step, "compared_from": previous_snapshot.created_at.isoformat() if previous_snapshot else None}

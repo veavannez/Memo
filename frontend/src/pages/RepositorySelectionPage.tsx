@@ -1,17 +1,18 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueries, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '../lib/api';
 import {
   DEMO_PROJECT, DEMO_REPO, isDemoMode,
 } from '../lib/demo';
 import type { Repository, Installation, Project } from '../types';
+
+const EMPTY_INSTALLATIONS: Installation[] = [];
 import {
   GitBranch, Lock, Globe, ArrowRight, Check, Search,
-  AlertCircle, RefreshCw, ExternalLink, Star, GitCommit,
+  AlertCircle, RefreshCw,
   ChevronDown, ChevronUp, Loader2,
 } from 'lucide-react';
-import { timeAgo } from '../lib/utils';
 import toast from 'react-hot-toast';
 
 // ─── Error banner ──────────────────────────────────────────────────────────────
@@ -179,51 +180,44 @@ export default function RepositorySelectionPage() {
   const [search, setSearch] = useState('');
   const [step, setStep] = useState<'select' | 'configure'>('select');
 
-  // ── Fetch installations ──────────────────────────────────────────────────
+  // Fetch GitHub App installations accessible to the signed-in user.
   const {
-    data: installations = [],
+    data: installations = EMPTY_INSTALLATIONS,
     isLoading: loadingInstalls,
     error: installError,
     refetch: refetchInstalls,
   } = useQuery<Installation[]>({
     queryKey: ['github-installations'],
     queryFn: async () => {
-      if (isDemo) return [];
+      if (isDemo) return EMPTY_INSTALLATIONS;
       return api.get('/github/installations').then((r) => r.data);
     },
     enabled: !isDemo,
     retry: 1,
   });
 
-  // ── Fetch repositories per installation ──────────────────────────────────
-  const repoQueries = installations.map((inst) => ({
-    queryKey: ['github-repos', inst.installation_id],
-    queryFn: () =>
-      api
-        .get(`/github/installations/${inst.installation_id}/repositories`)
-        .then((r) => r.data as Repository[]),
-    enabled: !isDemo && installations.length > 0,
-    retry: 1,
-  }));
-
-  // Manually combine — useQueries would be ideal but we keep dep surface small
-  const [reposByInstall, setReposByInstall] = useState<Map<number, Repository[]>>(new Map());
-  React.useEffect(() => {
-    if (isDemo || installations.length === 0) return;
-    const map = new Map<number, Repository[]>();
-    Promise.all(
-      installations.map((inst) =>
+  // Fetch repositories for each accessible GitHub App installation.
+  const repositoryQueries = useQueries({
+    queries: installations.map((inst) => ({
+      queryKey: ['github-repos', inst.installation_id],
+      queryFn: () =>
         api
           .get(`/github/installations/${inst.installation_id}/repositories`)
-          .then((r) => ({ instId: inst.id, repos: r.data as Repository[] }))
-          .catch(() => ({ instId: inst.id, repos: [] }))
-      )
-    ).then((results) => {
-      results.forEach(({ instId, repos }) => map.set(instId, repos));
-      setReposByInstall(new Map(map));
-    });
-  }, [installations]);
+          .then((r) => r.data as Repository[]),
+      enabled: !isDemo,
+      retry: 1,
+    })),
+  });
 
+  const reposByInstall = new Map<number, Repository[]>();
+  installations.forEach((inst, index) => {
+    reposByInstall.set(inst.id, repositoryQueries[index]?.data ?? []);
+  });
+  const reposLoading = repositoryQueries.some((query) => query.isPending);
+  const failedRepoQuery = repositoryQueries.find((query) => query.error);
+  const repoError: any = failedRepoQuery?.error;
+  const repoLoadError = repoError?.response?.data?.detail
+    ?? (repoError ? 'Could not load repositories from GitHub.' : null);
   const allRepos = Array.from(reposByInstall.values()).flat();
 
   // ── Create project mutation ───────────────────────────────────────────────
@@ -232,11 +226,11 @@ export default function RepositorySelectionPage() {
       api.post('/projects', data).then((r) => r.data as Project),
     onSuccess: (project) => {
       queryClient.invalidateQueries({ queryKey: ['projects'] });
-      toast.success(`Project "${project.name}" created!`);
+      toast.success(`Repository "${project.repository?.full_name ?? project.name}" connected to MEMO.`);
       navigate(`/projects/${project.id}`);
     },
     onError: (err: any) => {
-      const msg = err?.response?.data?.detail ?? 'Failed to create project';
+      const msg = err?.response?.data?.detail ?? 'Failed to connect repository to MEMO';
       toast.error(msg);
     },
   });
@@ -309,10 +303,10 @@ export default function RepositorySelectionPage() {
 
         <div className="mb-8">
           <h1 className="font-display text-display-lg text-ink tracking-wide mb-1">
-            NAME YOUR PROJECT
+            SET UP IN MEMO
           </h1>
           <p className="text-sm text-ink-muted">
-            Configure your MEMO project for{' '}
+            Choose how this repository appears in MEMO for{' '}
             <code className="font-mono text-xs bg-paper-dark px-1 rounded">{selectedRepo.full_name}</code>.
           </p>
         </div>
@@ -332,7 +326,7 @@ export default function RepositorySelectionPage() {
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="label">Project Name</label>
+            <label className="label">Display Name</label>
             <input
               className="input"
               value={projectName}
@@ -370,11 +364,11 @@ export default function RepositorySelectionPage() {
               {createProject.isPending ? (
                 <>
                   <Loader2 className="w-4 h-4 animate-spin" />
-                  Creating…
+                  Adding…
                 </>
               ) : (
                 <>
-                  Create Project
+                  Add Repository to MEMO
                   <ArrowRight className="w-4 h-4" />
                 </>
               )}
@@ -399,15 +393,6 @@ export default function RepositorySelectionPage() {
             Choose a GitHub repository for MEMO to monitor.
           </p>
         </div>
-        <a
-          href={`https://github.com/apps/${import.meta.env.VITE_GITHUB_APP_SLUG || 'memo-workspace'}/installations/new`}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="btn-ghost text-xs flex-shrink-0 hidden sm:flex"
-        >
-          <ExternalLink className="w-3.5 h-3.5" />
-          Install on more accounts
-        </a>
       </div>
 
       {/* Error state */}
@@ -442,6 +427,43 @@ export default function RepositorySelectionPage() {
         </div>
       )}
 
+      {/* Repository loading and error states */}
+      {!loadingInstalls && installations.length > 0 && reposLoading && (
+        <div className="flex flex-col items-center justify-center py-16 gap-3">
+          <Loader2 className="w-6 h-6 animate-spin text-ink-faint" />
+          <p className="text-sm text-ink-muted">Loading repositories available to MEMO…</p>
+        </div>
+      )}
+
+      {!reposLoading && repoLoadError && (
+        <div className="mb-6">
+          <ErrorBanner message={repoLoadError} />
+        </div>
+      )}
+
+      {!reposLoading && !repoLoadError && installations.length > 0 && allRepos.length === 0 && (
+        <div className="card-editorial p-10 text-center">
+          <div className="empty-state">
+            <div className="empty-state-icon">
+              <GitBranch className="w-6 h-6" />
+            </div>
+            <h3 className="font-bold text-ink text-lg mb-2">No repositories available</h3>
+            <p className="text-ink-muted text-sm mb-6 max-w-sm">
+              The GitHub App is installed, but it has not been granted access to any repositories.
+              Update the installation and select the repositories you want MEMO to access.
+            </p>
+            <a
+              href={`https://github.com/apps/${import.meta.env.VITE_GITHUB_APP_SLUG || 'memo-workspace'}/installations/new`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="btn-primary inline-flex"
+            >
+              Manage Repository Access →
+            </a>
+          </div>
+        </div>
+      )}
+
       {/* No installations */}
       {!loadingInstalls && !installError && installations.length === 0 && (
         <div className="card-editorial p-10 text-center">
@@ -466,7 +488,7 @@ export default function RepositorySelectionPage() {
       )}
 
       {/* Repository list */}
-      {!loadingInstalls && installations.length > 0 && (
+      {!loadingInstalls && !reposLoading && !repoLoadError && installations.length > 0 && allRepos.length > 0 && (
         <>
           {/* Search */}
           <div className="relative mb-5">

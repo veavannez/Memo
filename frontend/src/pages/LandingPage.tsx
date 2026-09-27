@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../features/auth/AuthContext';
 import api from '../lib/api';
@@ -38,6 +38,10 @@ export default function LandingPage() {
 
   // Scroll reveal
   useEffect(() => {
+    if (!('IntersectionObserver' in window)) {
+      revealRefs.current.forEach((el) => el?.classList.add('revealed'));
+      return;
+    }
     const observer = new IntersectionObserver(
       (entries) => entries.forEach((e) => { if (e.isIntersecting) e.target.classList.add('revealed'); }),
       { threshold: 0.12 }
@@ -105,8 +109,11 @@ export default function LandingPage() {
           <p className="text-display-xl text-ink mb-2 leading-none font-display">
             SAVE YOUR WORK.
           </p>
-          <p className="text-display-xl text-ink mb-8 leading-none font-display">
+          <p className="text-display-xl text-ink mb-2 leading-none font-display">
             SHARE THE CONTEXT.
+          </p>
+          <p className="text-display-xl text-ink mb-8 leading-none font-display">
+            KEEP CODING.
           </p>
 
           <p className="text-lg text-ink-soft max-w-lg mb-8 leading-relaxed fade-up-1">

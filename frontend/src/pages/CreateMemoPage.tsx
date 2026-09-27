@@ -1,4 +1,7 @@
 import React from 'react';
+import { useQuery } from '@tanstack/react-query';
+import api from '../lib/api';
+import type { SessionContext } from '../types';
 import { useParams, useNavigate } from 'react-router-dom';
 import { MemoForm } from '../features/memos/MemoForm';
 import { isDemoMode, DEMO_SESSION_CONTEXT } from '../lib/demo';
@@ -15,9 +18,12 @@ export default function CreateMemoPage() {
     navigate(`/projects/${projectId}/memos/1`);
   };
 
-  // In demo mode we pass the pre-built session context.
-  // In real mode it would come from a GitHub API prefetch (future).
-  const ctx = isDemo ? DEMO_SESSION_CONTEXT : undefined;
+  const { data: liveContext } = useQuery<SessionContext>({
+    queryKey: ['session-context', projectId],
+    queryFn: () => api.get(`/projects/${projectId}/memos/session-context`).then((r) => r.data),
+    enabled: !!projectId && !isDemo,
+  });
+  const ctx = isDemo ? DEMO_SESSION_CONTEXT : liveContext;
 
   return (
     <div className="max-w-6xl mx-auto px-5 sm:px-8 py-8">
@@ -34,7 +40,7 @@ export default function CreateMemoPage() {
       {/* Page header */}
       <div className="flex items-start justify-between mb-8 gap-6 flex-wrap">
         <div>
-          <h1 className="text-3xl font-bold text-ink leading-tight mb-1">End Session</h1>
+          <h1 className="text-3xl font-bold text-ink leading-tight mb-1">I'm Done for Today</h1>
           <p className="text-sm text-ink-muted">
             Document your state before you close the laptop.
           </p>

@@ -8,6 +8,7 @@ from sqlmodel import select
 from datetime import datetime, timezone
 
 from app.core.database import get_session
+from app.core.config import settings
 from app.models.models import User, GitHubAccount, GitHubInstallation, Repository
 from app.schemas.schemas import InstallationRead, RepositoryRead
 from app.services import github_service
@@ -85,6 +86,15 @@ async def list_installation_repositories(
     List repositories accessible to a GitHub App installation.
     Syncs from GitHub API and stores locally.
     """
+    if not settings.GITHUB_APP_ID or not settings.github_private_key:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=(
+                "GitHub repository access is not configured. Check GITHUB_APP_ID "
+                "and GITHUB_APP_PRIVATE_KEY_PATH in backend/.env, then restart the backend."
+            ),
+        )
+
     # Verify the installation exists and is accessible
     inst_result = await session.exec(
         select(GitHubInstallation).where(

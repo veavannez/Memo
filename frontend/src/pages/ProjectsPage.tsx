@@ -96,12 +96,12 @@ export default function ProjectsPage() {
             <GitBranch className="w-4 h-4" />
             {isConnecting ? 'Connectingâ€¦' : 'Connect GitHub'}
           </button>
-        ) : (
+        ) : projects.length > 0 ? (
           <button className="btn-primary" onClick={() => navigate('/projects/new')}>
             <Plus className="w-4 h-4" />
-            New Project
+            Connect Repository
           </button>
-        )}
+        ) : null}
       </div>
 
       {/* Demo mode CTA */}
@@ -124,7 +124,7 @@ export default function ProjectsPage() {
             </p>
             <button className="btn-primary" onClick={() => navigate('/projects/new')}>
               <Plus className="w-4 h-4" />
-              Create your first project
+              Connect your first repository
             </button>
           </div>
         </div>

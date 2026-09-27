@@ -195,7 +195,7 @@ def build_project_context(
         "projectMetadata": {
             "totalCommits": len(norm_commits),
             "openPRCount": len([p for p in norm_prs if p["state"] == "open"]),
-            "openIssueCount": len(norm_issues),
+            "openIssueCount": len([i for i in norm_issues if i["state"] == "open"]),
             "activeBranchCount": len(norm_branches),
         },
         "collectedAt": datetime.now(timezone.utc).isoformat(),

@@ -8,7 +8,7 @@ import { formatDateTime, statusBadgeClass, getStatusLabel, timeAgo } from '../li
 import {
   GitCommit, GitPullRequest, ExternalLink, Edit,
   AlertTriangle, CheckCircle2, ArrowLeft, ArrowRight,
-  CheckSquare, GitBranch, FileCode, Plus, Link2,
+  CheckSquare, GitBranch, FileCode,
 } from 'lucide-react';
 import { MemoForm } from '../features/memos/MemoForm';
 import toast from 'react-hot-toast';

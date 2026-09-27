@@ -2,8 +2,8 @@ import React, { useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '../lib/api';
-import { DEMO_TASKS, DEMO_MEMBERS, isDemoMode } from '../lib/demo';
-import type { Task, TaskStatus, ProjectMember } from '../types';
+import { DEMO_TASKS, isDemoMode } from '../lib/demo';
+import type { Task, TaskStatus } from '../types';
 import { priorityBadgeClass, getPriorityLabel } from '../lib/utils';
 import { Plus, X, List, AlertTriangle, Zap } from 'lucide-react';
 import toast from 'react-hot-toast';
@@ -20,13 +20,15 @@ function KanbanCard({
   task,
   onMoveNext,
   onMovePrev,
+  onDragStart,
 }: {
   task: Task;
   onMoveNext?: () => void;
   onMovePrev?: () => void;
+  onDragStart?: (event: React.DragEvent) => void;
 }) {
   return (
-    <div className={`card p-3 mb-2 hover:border-ink/40 transition-colors ${task.status === 'blocked' ? 'border-sticky-pink/40' : ''}`}>
+    <div draggable={!!onDragStart} onDragStart={onDragStart} className={`card p-3 mb-2 hover:border-ink/40 transition-colors ${onDragStart ? 'cursor-grab active:cursor-grabbing' : ''} ${task.status === 'blocked' ? 'border-sticky-pink/40' : ''}`}>
       <div className="flex items-start justify-between gap-2 mb-2">
         <p className={`text-sm font-medium leading-snug ${task.status === 'done' ? 'line-through text-ink-faint' : 'text-ink'}`}>
           {task.title}
@@ -40,6 +42,20 @@ function KanbanCard({
         <p className="text-xs text-ink-muted mb-2 line-clamp-2">{task.description}</p>
       )}
 
+      {task.ai_generated && (
+        <div className="flex items-center gap-1.5 mb-2">
+          <span className="text-[9px] font-black tracking-wider px-1.5 py-0.5 rounded bg-sticky-lavender/40 border border-sticky-lavender">MEMO SUGGESTED</span>
+          <span className="text-[10px] text-ink-faint">Optional AI-generated task</span>
+        </div>
+      )}
+
+      {(task.source_evidence?.length ?? 0) > 0 && (
+        <div className="mb-2 space-y-0.5">
+          {(task.source_evidence ?? []).slice(0, 2).map((item) => item.startsWith('http') ? (
+            <a key={item} href={item} target="_blank" rel="noreferrer" className="block text-[10px] text-ink-muted underline truncate">GitHub evidence ↗</a>
+          ) : <p key={item} className="text-[10px] font-mono text-ink-faint truncate">{item}</p>)}
+        </div>
+      )}
       {task.status === 'blocked' && (
         <p className="text-xs text-sticky-pink flex items-center gap-1 mb-2">
           <AlertTriangle className="w-3 h-3" /> Blocked
@@ -233,7 +249,7 @@ export default function KanbanPage() {
         {COLUMNS.map(({ status, label, headerColor, dotColor }) => {
           const colTasks = tasks.filter((t) => t.status === status);
           return (
-            <div key={status} className="w-72 flex-shrink-0">
+            <div key={status} className="w-72 flex-shrink-0" onDragOver={(event) => event.preventDefault()} onDrop={(event) => { const taskId = Number(event.dataTransfer.getData('text/task-id')); if (taskId) updateTask.mutate({ taskId, status }); }}>
               {/* Column header */}
               <div className={`flex items-center justify-between mb-3 pb-2 border-b-2 ${headerColor}`}>
                 <div className="flex items-center gap-2">
@@ -275,6 +291,7 @@ export default function KanbanPage() {
                   <KanbanCard
                     key={task.id}
                     task={task}
+                    onDragStart={!isDemo ? (event) => event.dataTransfer.setData('text/task-id', String(task.id)) : undefined}
                     onMoveNext={!isDemo ? () => {
                       const next = getAdjacentStatus(task.status, 'next');
                       if (next) updateTask.mutate({ taskId: task.id, status: next });

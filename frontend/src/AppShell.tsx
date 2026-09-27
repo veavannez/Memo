@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { Link, Outlet, useParams, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from './features/auth/AuthContext';
 import { useQuery } from '@tanstack/react-query';
@@ -27,7 +27,6 @@ function AvatarSmall({ name, src }: { name: string; src?: string }) {
 }
 
 // ─── Workflow step labels (used in sub-nav context) ───────────────────────────
-const WORKFLOW_STEPS = ['Dashboard', 'Memos', 'Tasks', 'Kanban', 'Catch Me Up'] as const;
 
 function AppShell() {
   const { user, logout, isDemo } = useAuth();
@@ -64,7 +63,6 @@ function AppShell() {
       : location.pathname.startsWith(path);
 
   // Determine current workflow position for context display
-  const activeNav = navItems.find((n) => isActive(n.to));
 
   const handleLogout = async () => {
     setUserMenuOpen(false);

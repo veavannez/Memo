@@ -111,7 +111,7 @@ This project follows the IBM watsonx Hackathon security guidelines:
 | Backend  | FastAPI, SQLModel, Alembic, SQLite (dev) / PostgreSQL (prod) |
 | Frontend | React 19, Vite, TypeScript, Tailwind CSS, TanStack Query |
 | Auth     | GitHub OAuth via GitHub App + JWT |
-| AI       | IBM watsonx (planned) |
+| AI       | IBM watsonx.ai with validated, evidence-grounded fallbacks |
 
 ---
 
@@ -120,3 +120,6 @@ This project follows the IBM watsonx Hackathon security guidelines:
 - Read [SECURITY.MD](SECURITY.MD) for credential guidelines
 - Contact hackathon support through the mentor channel
 - Ask in the hackathon Slack workspace
+## Hackathon Demo
+
+MEMO is a **developer continuity and project intelligence layer**. See [HACKATHON_DEMO.md](HACKATHON_DEMO.md) for the repeatable demo flow, safe sample-data specification, fallback plan, business value, and IBM Bob 2.0 development session summary.

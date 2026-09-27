@@ -81,6 +81,46 @@ async def list_memos(
     return [await _memo_to_read(memo, user, session) for memo, user in rows]
 
 
+@router.get("/session-context")
+async def get_session_context(
+    project_id: int,
+    current_user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+):
+    """GitHub evidence since this developer's previous completed session."""
+    await get_project_membership(project_id, current_user, session)
+    project = (await session.exec(select(Project).where(Project.id == project_id))).first()
+    repo = (await session.exec(select(Repository).where(Repository.id == project.repository_id))).first() if project else None
+    installation = (await session.exec(select(GitHubInstallation).where(GitHubInstallation.id == repo.installation_id))).first() if repo else None
+    if not repo or not installation:
+        return {"branch": "main", "commits": [], "pull_requests": [], "changed_files": [], "open_issues": []}
+
+    from app.api.intelligence import _fetch_project_context
+    context = await _fetch_project_context(repo, installation)
+    previous = (await session.exec(select(Memo).where(Memo.project_id == project_id, Memo.author_id == current_user.id, Memo.is_draft == False).order_by(Memo.created_at.desc()).limit(1))).first()
+    since = previous.created_at if previous else datetime.now(timezone.utc) - timedelta(days=1)
+    if since.tzinfo is None:
+        since = since.replace(tzinfo=timezone.utc)
+    gh_account = (await session.exec(select(GitHubAccount).where(GitHubAccount.user_id == current_user.id))).first()
+    login = gh_account.github_login if gh_account else None
+
+    def recent(timestamp):
+        if not timestamp: return True
+        try: return datetime.fromisoformat(timestamp.replace("Z", "+00:00")) > since
+        except (ValueError, TypeError): return False
+
+    commits = []
+    for index, commit in enumerate(context.get("recentCommits", [])):
+        if recent(commit.get("timestamp")) and (not login or commit.get("author") == login):
+            commits.append({"id": index + 1, "activity_type": "commit", "github_id": commit.get("sha", ""), "title": commit.get("message"), "url": commit.get("url"), "author_login": commit.get("author"), "occurred_at": commit.get("timestamp"), "branch": commit.get("branch"), "changed_files": commit.get("changedFiles", []), "additions": commit.get("additions", 0), "deletions": commit.get("deletions", 0)})
+    pull_requests = []
+    for index, pr in enumerate(context.get("openPullRequests", [])):
+        if recent(pr.get("updatedAt")) and (not login or pr.get("author") == login):
+            pull_requests.append({"id": index + 1000, "activity_type": "pull_request", "github_id": str(pr.get("number", "")), "title": pr.get("title"), "url": pr.get("url"), "author_login": pr.get("author"), "occurred_at": pr.get("updatedAt"), "changed_files": pr.get("changedFiles", []), "additions": pr.get("additions", 0), "deletions": pr.get("deletions", 0), "pr_state": pr.get("state"), "pr_number": pr.get("number")})
+    files = list(dict.fromkeys(path for item in commits + pull_requests for path in (item.get("changed_files") or [])))
+    issues = [{"id": issue.get("number"), "number": issue.get("number"), "title": issue.get("title"), "url": issue.get("url")} for issue in context.get("openIssues", []) if issue.get("state") == "open"]
+    return {"branch": context.get("activeBranch", repo.default_branch), "commits": commits, "pull_requests": pull_requests, "changed_files": files, "open_issues": issues}
+
 @router.get("/{memo_id}", response_model=MemoRead)
 async def get_memo(
     project_id: int,

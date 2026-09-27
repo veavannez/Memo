@@ -217,6 +217,12 @@ class TaskRead(BaseModel):
     status: str
     priority: str
     github_issue_url: Optional[str] = None
+    source_type: Optional[str] = None
+    source_gap_id: Optional[int] = None
+    source_evidence: List[str] = []
+    ai_generated: bool = False
+    assignment_reason: Optional[str] = None
+    assignment_confidence: Optional[float] = None
     position: int
     created_at: datetime
     updated_at: datetime
@@ -236,6 +242,25 @@ class TaskFromNextSteps(BaseModel):
 # Catch Me Up
 # ─────────────────────────────────────────────
 
+class BriefingEvidence(BaseModel):
+    type: str
+    label: str
+    url: Optional[str] = None
+
+
+class BriefingItem(BaseModel):
+    title: str
+    detail: Optional[str] = None
+    tone: str = "neutral"
+    evidence: List[BriefingEvidence] = []
+
+
+class TeamBriefing(BaseModel):
+    name: str
+    login: Optional[str] = None
+    summary: str
+    evidence: List[BriefingEvidence] = []
+
 class CatchMeUpResponse(BaseModel):
     user: UserRead
     last_session_memo: Optional[MemoRead] = None
@@ -245,6 +270,13 @@ class CatchMeUpResponse(BaseModel):
     recent_github_activity: List[MemoGitHubActivityRead] = []
     suggested_next_steps: List[str] = []
     summary_lines: List[str] = []
+    briefing_summary: Optional[str] = None
+    what_changed: List[BriefingItem] = []
+    team_activity: List[TeamBriefing] = []
+    attention_items: List[BriefingItem] = []
+    next_step: Optional[BriefingItem] = None
+    compared_from: Optional[str] = None
+    generated_at: Optional[str] = None
 
 
 # ─────────────────────────────────────────────
@@ -302,6 +334,25 @@ class DetectedGapTaskCreate(BaseModel):
     title: Optional[str] = None
     description: Optional[str] = None
     priority: str = "medium"
+    status: TaskStatus = TaskStatus.todo
+    assignee_id: Optional[int] = None
+    assignment_reason: Optional[str] = None
+    assignment_confidence: Optional[float] = None
+
+
+class GapTaskSuggestion(BaseModel):
+    title: str
+    description: str
+    priority: str = "medium"
+    status: str = "todo"
+    repository: str
+    related_pr: Optional[str] = None
+    evidence: List[str] = []
+    suggested_owner_id: Optional[int] = None
+    suggested_owner_name: Optional[str] = None
+    suggested_owner_login: Optional[str] = None
+    assignment_reason: str
+    assignment_confidence: float = 0.0
 
 
 class SuggestedNextStep(BaseModel):
@@ -327,6 +378,45 @@ class ProjectAnalysisResponse(BaseModel):
     # True when watsonx.ai is not configured
     aiAvailable: bool = True
 
+
+class IntelligenceChange(BaseModel):
+    kind: str
+    title: str
+    description: str
+    evidence: List[str] = []
+    tone: str = "positive"
+
+
+class TaskUpdateProposalRead(BaseModel):
+    id: int
+    task_id: int
+    task_title: str
+    proposed_status: str
+    reason: str
+    evidence: List[str] = []
+    confidence: float
+    status: str
+
+
+class ProjectRefreshResponse(BaseModel):
+    analysis: ProjectAnalysisResponse
+    changes: List[IntelligenceChange] = []
+    taskProposals: List[TaskUpdateProposalRead] = []
+    automationMode: str
+    previousSnapshotAt: Optional[str] = None
+    refreshedAt: str
+    baselineCreated: bool = False
+
+
+class AutomationModeUpdate(BaseModel):
+    mode: str
+
+class HandoffSynthesisRequest(BaseModel):
+    completed: Optional[str] = None
+    in_progress: Optional[str] = None
+    blocked: Optional[str] = None
+    next_steps: Optional[str] = None
+    notes: Optional[str] = None
 
 class GeneratedMemoContent(BaseModel):
     """AI-generated memo fields — validated before use."""

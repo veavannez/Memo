@@ -164,6 +164,7 @@ class Project(SQLModel, table=True):
     name: str = Field(sa_column=Column(String(255), nullable=False))
     description: Optional[str] = Field(default=None, sa_column=Column(Text, nullable=True))
     is_active: bool = Field(default=True, sa_column=Column(Boolean, nullable=False, default=True))
+    automation_mode: str = Field(default="suggest", sa_column=Column(String(20), nullable=False, default="suggest"))
     created_at: datetime = Field(default_factory=utcnow, sa_column=Column(DateTime(timezone=True), nullable=False))
     updated_at: datetime = Field(default_factory=utcnow, sa_column=Column(DateTime(timezone=True), nullable=False))
 
@@ -278,6 +279,12 @@ class Task(SQLModel, table=True):
     status: str = Field(default=TaskStatus.todo, sa_column=Column(String(50), nullable=False, default="todo"))
     priority: str = Field(default=TaskPriority.medium, sa_column=Column(String(50), nullable=False, default="medium"))
     github_issue_url: Optional[str] = Field(default=None, sa_column=Column(Text, nullable=True))
+    source_type: Optional[str] = Field(default=None, sa_column=Column(String(50), nullable=True))
+    source_gap_id: Optional[int] = Field(default=None, sa_column=Column(Integer, nullable=True))
+    source_evidence_json: str = Field(default="[]", sa_column=Column(Text, nullable=False, default="[]"))
+    ai_generated: bool = Field(default=False, sa_column=Column(Boolean, nullable=False, default=False))
+    assignment_reason: Optional[str] = Field(default=None, sa_column=Column(Text, nullable=True))
+    assignment_confidence: Optional[float] = Field(default=None, nullable=True)
     position: int = Field(default=0, sa_column=Column(Integer, nullable=False, default=0))
     created_at: datetime = Field(default_factory=utcnow, sa_column=Column(DateTime(timezone=True), nullable=False))
     updated_at: datetime = Field(default_factory=utcnow, sa_column=Column(DateTime(timezone=True), nullable=False))
@@ -312,6 +319,31 @@ class DetectedGapRecord(SQLModel, table=True):
 
 
 # ─────────────────────────────────────────────
+class ProjectIntelligenceSnapshot(SQLModel, table=True):
+    __tablename__ = "project_intelligence_snapshots"
+    __table_args__ = (Index("ix_intelligence_snapshots_project_created", "project_id", "created_at"),)
+    id: Optional[int] = Field(default=None, primary_key=True)
+    project_id: int = Field(sa_column=Column(Integer, ForeignKey("projects.id", ondelete="CASCADE"), nullable=False))
+    context_hash: str = Field(sa_column=Column(String(64), nullable=False))
+    context_json: str = Field(sa_column=Column(Text, nullable=False))
+    analysis_json: str = Field(sa_column=Column(Text, nullable=False))
+    created_at: datetime = Field(default_factory=utcnow, sa_column=Column(DateTime(timezone=True), nullable=False))
+
+
+class TaskUpdateProposal(SQLModel, table=True):
+    """A GitHub-evidenced task change that always requires human review."""
+    __tablename__ = "task_update_proposals"
+    __table_args__ = (Index("ix_task_update_proposals_project", "project_id"), Index("ix_task_update_proposals_status", "status"))
+    id: Optional[int] = Field(default=None, primary_key=True)
+    project_id: int = Field(sa_column=Column(Integer, ForeignKey("projects.id", ondelete="CASCADE"), nullable=False))
+    task_id: int = Field(sa_column=Column(Integer, ForeignKey("tasks.id", ondelete="CASCADE"), nullable=False))
+    proposed_status: str = Field(default="done", sa_column=Column(String(50), nullable=False))
+    reason: str = Field(sa_column=Column(Text, nullable=False))
+    evidence_json: str = Field(default="[]", sa_column=Column(Text, nullable=False))
+    confidence: float = Field(default=0.8, nullable=False)
+    status: str = Field(default="pending", sa_column=Column(String(20), nullable=False, default="pending"))
+    created_at: datetime = Field(default_factory=utcnow, sa_column=Column(DateTime(timezone=True), nullable=False))
+    updated_at: datetime = Field(default_factory=utcnow, sa_column=Column(DateTime(timezone=True), nullable=False))
 # GitHub Webhook Events (deduplication)
 # ─────────────────────────────────────────────
 

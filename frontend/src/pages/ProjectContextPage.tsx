@@ -4,8 +4,8 @@
  * Shows the normalized ProjectContext as a MEMO-branded activity feed.
  * Does NOT look like GitHub — uses MEMO's visual language.
  */
-import React, { useState } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useState } from 'react';
+import { useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { getGitHubProvider, buildActivityFeed } from '../lib/github';
 import { isDemoMode } from '../lib/demo';
@@ -17,7 +17,7 @@ import {
   GitCommit, GitPullRequest, CircleDot, GitBranch,
   AlertCircle, RefreshCw, Loader2, ChevronDown, ChevronUp,
   ArrowUpRight, Lock, Globe, Clock, Users, Code2, CheckCircle2,
-  XCircle, AlertTriangle, Minus,
+  XCircle,
 } from 'lucide-react';
 import { timeAgo, formatDate } from '../lib/utils';
 import api from '../lib/api';
@@ -332,11 +332,9 @@ function BranchesSection({ branches }: { branches: NormalizedBranch[] }) {
 function ErrorState({
   error,
   onRetry,
-  repoFullName,
 }: {
   error: string;
   onRetry: () => void;
-  repoFullName?: string;
 }) {
   const isNotFound = error.includes('not found') || error.includes('404');
   const isPermission = error.includes('403') || error.includes('forbidden') || error.includes('inactive');
@@ -468,7 +466,7 @@ export default function ProjectContextPage() {
           </h1>
           <p className="font-mono text-sm text-ink-faint">{repoFullName}</p>
         </div>
-        <ErrorState error={msg} onRetry={() => refetch()} repoFullName={repoFullName} />
+        <ErrorState error={msg} onRetry={() => refetch()} />
       </div>
     );
   }

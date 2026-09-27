@@ -20,17 +20,19 @@ import {
   Brain, CheckCircle, Circle, AlertTriangle, ChevronDown, ChevronUp,
   Sparkles, Search, ArrowRight, Info, Zap, RefreshCw, AlertCircle, Pencil, X, Plus,
 } from 'lucide-react';
-import type { ProjectAnalysis, EvidencedItem, DetectedGap, SuggestedNextStep } from '../types';
+import type { EvidencedItem, DetectedGap, SuggestedNextStep, GapTaskSuggestion, ProjectMember, Task, ProjectRefreshResponse, AutomationMode } from '../types';
 import {
-  analyzeProject,
   getIntelligenceStatus,
   confidenceBadge,
   formatModelId,
   editDetectedGap,
   dismissDetectedGap,
   createTaskFromGap,
+  getGapTaskSuggestion,
+  refreshProjectIntelligence, setAutomationMode, approveTaskUpdate, dismissTaskUpdate,
 } from '../lib/watsonx';
 import toast from 'react-hot-toast';
+import api from '../lib/api';
 import { DEMO_PROJECT_ANALYSIS, isDemoMode } from '../lib/demo';
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
@@ -98,94 +100,112 @@ function GapCard({
   onUpdate: (gap: DetectedGap) => void;
 }) {
   const [editing, setEditing] = useState(false);
-  const [creating, setCreating] = useState(false);
+  const [reviewing, setReviewing] = useState(false);
+  const [suggestion, setSuggestion] = useState<GapTaskSuggestion | null>(null);
+  const [createdTask, setCreatedTask] = useState<Task | null>(null);
   const [title, setTitle] = useState(gap.title);
   const [description, setDescription] = useState(gap.description);
   const [category, setCategory] = useState(gap.category);
   const [priority, setPriority] = useState<'low' | 'medium' | 'high'>('medium');
+  const [status, setStatus] = useState<'todo' | 'in_progress' | 'blocked' | 'done'>('todo');
+  const [selectedOwner, setSelectedOwner] = useState('');
   const canAct = demo || gap.id !== undefined;
+
+  const { data: members = [] } = useQuery<ProjectMember[]>({
+    queryKey: ['project-members', projectId],
+    queryFn: () => demo ? Promise.resolve([]) : api.get(`/projects/${projectId}/members`).then((r) => r.data),
+    enabled: reviewing && !demo,
+  });
 
   const save = async () => {
     try {
-      const updated = demo
-        ? { ...gap, title, description, category }
+      const updated = demo ? { ...gap, title, description, category }
         : await editDetectedGap(projectId, gap.id!, { title, description, category });
-      onUpdate(updated);
-      setEditing(false);
-      toast.success('Gap updated');
+      onUpdate(updated); setEditing(false); toast.success('Gap updated');
     } catch { toast.error('Could not update gap'); }
   };
 
   const dismiss = async () => {
     try {
       if (!demo) await dismissDetectedGap(projectId, gap.id!);
-      onRemove(gap.id);
-      toast.success('Gap dismissed');
+      onRemove(gap.id); toast.success('Gap dismissed');
     } catch { toast.error('Could not dismiss gap'); }
+  };
+
+  const openReview = async () => {
+    setReviewing(true);
+    try {
+      const draft = demo ? {
+        title, description, priority: 'medium', status: 'todo', repository: 'Demo repository',
+        evidence: gap.evidence, assignment_reason: 'Demo suggestion based on related repository activity.',
+        assignment_confidence: gap.confidence,
+      } as GapTaskSuggestion : await getGapTaskSuggestion(projectId, gap.id!);
+      setSuggestion(draft); setTitle(draft.title); setDescription(draft.description);
+      setPriority(draft.priority); setStatus(draft.status);
+      setSelectedOwner(draft.suggested_owner_id ? String(draft.suggested_owner_id) : '');
+    } catch { setReviewing(false); toast.error('Could not prepare task suggestion'); }
   };
 
   const createTask = async () => {
     try {
-      if (!demo) await createTaskFromGap(projectId, gap.id!, { title, description, priority });
-      onRemove(gap.id);
-      toast.success('Task created — you remain in control of its status and assignee');
+      const task = demo ? ({ id: 0 } as Task) : await createTaskFromGap(projectId, gap.id!, {
+        title, description, priority, status,
+        assignment_reason: suggestion?.assignment_reason,
+        assignment_confidence: suggestion?.assignment_confidence,
+      });
+      setCreatedTask(task);
+      toast.success('Task created in Kanban');
     } catch { toast.error('Could not create task'); }
   };
 
+  const assignTask = async () => {
+    if (!createdTask || !selectedOwner) return;
+    try {
+      if (!demo) await api.patch(`/projects/${projectId}/tasks/${createdTask.id}`, { assignee_id: Number(selectedOwner) });
+      toast.success('Task assigned'); setReviewing(false); onRemove(gap.id);
+    } catch { toast.error('Could not assign task'); }
+  };
+
   return (
-    <article className="rounded-card border-2 border-sticky-orange/70 bg-paper-cream shadow-editorial-sm overflow-hidden">
-      <div className="bg-sticky-orange/20 border-b border-sticky-orange/40 px-4 py-2 flex items-center justify-between gap-3">
-        <span className="text-[11px] font-black tracking-[0.16em] text-ink">DETECTED GAP</span>
-        <span className="text-[10px] font-bold rounded-pill border border-ink/20 bg-paper-cream px-2 py-0.5">{category}</span>
-      </div>
-      <div className="p-4">
-        {editing ? (
-          <div className="space-y-3">
+    <>
+      <article className="rounded-card border-2 border-sticky-orange/70 bg-paper-cream shadow-editorial-sm overflow-hidden">
+        <div className="bg-sticky-orange/20 border-b border-sticky-orange/40 px-4 py-2 flex items-center justify-between gap-3">
+          <span className="text-[11px] font-black tracking-[0.16em] text-ink">DETECTED GAP</span>
+          <span className="text-[10px] font-bold rounded-pill border border-ink/20 bg-paper-cream px-2 py-0.5">{category}</span>
+        </div>
+        <div className="p-4">
+          {editing ? <div className="space-y-3">
             <input className="input text-sm" value={title} onChange={(e) => setTitle(e.target.value)} />
             <textarea className="textarea text-sm min-h-24" value={description} onChange={(e) => setDescription(e.target.value)} />
-            <select className="select text-sm" value={category} onChange={(e) => setCategory(e.target.value as DetectedGap['category'])}>
-              {['TESTING','IMPLEMENTATION','INTEGRATION','DOCUMENTATION','ERROR HANDLING','SECURITY','UI','BACKEND','FRONTEND','DEPLOYMENT'].map((c) => <option key={c}>{c}</option>)}
-            </select>
+            <select className="select text-sm" value={category} onChange={(e) => setCategory(e.target.value as DetectedGap['category'])}>{['TESTING','IMPLEMENTATION','INTEGRATION','DOCUMENTATION','ERROR HANDLING','SECURITY','UI','BACKEND','FRONTEND','DEPLOYMENT'].map((item) => <option key={item}>{item}</option>)}</select>
             <div className="flex gap-2"><button className="btn-primary text-xs" onClick={save}>Save</button><button className="btn-ghost text-xs" onClick={() => setEditing(false)}>Cancel</button></div>
-          </div>
-        ) : (
-          <>
-            <div className="flex items-start gap-2 mb-3">
-              <AlertCircle className="w-5 h-5 text-sticky-orange flex-shrink-0 mt-0.5" />
-              <div className="flex-1">
-                <h3 className="text-base font-bold text-ink">{gap.title}</h3>
-                <p className="text-[10px] font-bold text-ink-faint mt-2">MEMO NOTICED</p>
-                <p className="text-xs text-ink-muted mt-0.5 leading-relaxed">{gap.description}</p>
-                <p className="text-xs text-ink-faint mt-2 italic">{gap.reason}</p>
-              </div>
-            </div>
-            <div className="flex items-center gap-2 py-2 border-y border-border mb-2">
-              <span className="text-[10px] font-bold text-ink-faint">CONFIDENCE</span>
-              <ConfidencePill score={gap.confidence} />
-              <span className="text-[10px] text-ink-faint ml-auto">Suggestion, not fact</span>
-            </div>
+          </div> : <>
+            <div className="flex items-start gap-2 mb-3"><AlertCircle className="w-5 h-5 text-sticky-orange flex-shrink-0 mt-0.5" /><div><h3 className="text-base font-bold text-ink">{gap.title}</h3><p className="text-[10px] font-bold text-ink-faint mt-2">MEMO NOTICED</p><p className="text-xs text-ink-muted mt-0.5">{gap.description}</p><p className="text-xs text-ink-faint mt-2 italic">{gap.reason}</p></div></div>
+            <div className="flex items-center gap-2 py-2 border-y border-border mb-2"><span className="text-[10px] font-bold text-ink-faint">CONFIDENCE</span><ConfidencePill score={gap.confidence} /><span className="text-[10px] text-ink-faint ml-auto">Suggestion, not fact</span></div>
             <EvidenceList evidence={gap.evidence} />
-          </>
-        )}
-        {!editing && (
-          <div className="mt-4 pt-3 border-t border-border">
-            {creating ? (
-              <div className="space-y-2">
-                <input className="input text-sm" value={title} onChange={(e) => setTitle(e.target.value)} />
-                <textarea className="textarea text-sm min-h-20" value={description} onChange={(e) => setDescription(e.target.value)} />
-                <div className="flex gap-2 items-center"><select className="select text-xs w-28" value={priority} onChange={(e) => setPriority(e.target.value as typeof priority)}><option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option></select><button className="btn-primary text-xs" onClick={createTask}><Plus className="w-3 h-3" />Create task</button><button className="btn-ghost text-xs" onClick={() => setCreating(false)}>Cancel</button></div>
-              </div>
-            ) : (
-              <div className="flex flex-wrap gap-2">
-                <button disabled={!canAct} className="btn-primary text-xs" onClick={() => setCreating(true)}><Plus className="w-3 h-3" />Create task</button>
-                <button disabled={!canAct} className="btn-secondary text-xs" onClick={() => setEditing(true)}><Pencil className="w-3 h-3" />Edit</button>
-                <button disabled={!canAct} className="btn-ghost text-xs" onClick={dismiss}><X className="w-3 h-3" />Dismiss</button>
-              </div>
-            )}
+            <div className="mt-4 pt-3 border-t border-border flex flex-wrap gap-2"><button disabled={!canAct} className="btn-primary text-xs" onClick={openReview}><Plus className="w-3 h-3" />Review task</button><button className="btn-secondary text-xs" onClick={() => setEditing(true)}><Pencil className="w-3 h-3" />Edit</button><button className="btn-ghost text-xs" onClick={dismiss}><X className="w-3 h-3" />Dismiss</button></div>
+          </>}
+        </div>
+      </article>
+
+      {reviewing && (
+        <div className="fixed inset-0 z-[100] bg-ink/40 flex items-center justify-center p-4" onMouseDown={(e) => e.target === e.currentTarget && setReviewing(false)}>
+          <div className="bg-paper border-2 border-ink rounded-card shadow-memo-lg w-full max-w-2xl max-h-[90vh] overflow-y-auto p-6">
+            <div className="flex justify-between items-start mb-5"><div><p className="text-[10px] font-black tracking-[0.16em] text-sticky-orange">SUGGESTED TASK · REVIEW BEFORE CREATING</p><h2 className="text-xl font-bold mt-1">Turn this gap into work</h2></div><button className="btn-ghost" onClick={() => setReviewing(false)}><X className="w-4 h-4" /></button></div>
+            {!suggestion ? <div className="py-12 text-center"><div className="spinner mx-auto" /></div> : <div className="space-y-4">
+              <div><label className="label">Task</label><input className="input" value={title} onChange={(e) => setTitle(e.target.value)} disabled={!!createdTask} /></div>
+              <div><label className="label">Description</label><textarea className="textarea min-h-24" value={description} onChange={(e) => setDescription(e.target.value)} disabled={!!createdTask} /></div>
+              <div className="grid sm:grid-cols-2 gap-4"><div><p className="label">Repository</p><p className="text-sm font-mono">{suggestion.repository}</p></div><div><p className="label">Related PR</p><p className="text-sm">{suggestion.related_pr || 'No related PR identified'}</p></div></div>
+              <div><p className="label">Evidence</p><ul className="space-y-1">{suggestion.evidence.map((item) => <li key={item} className="text-xs font-mono text-ink-muted">• {item}</li>)}</ul></div>
+              <div className="grid sm:grid-cols-2 gap-4"><div><label className="label">Priority</label><select className="select" value={priority} onChange={(e) => setPriority(e.target.value as typeof priority)} disabled={!!createdTask}><option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option></select></div><div><label className="label">Status</label><select className="select" value={status} onChange={(e) => setStatus(e.target.value as typeof status)} disabled={!!createdTask}><option value="todo">Todo</option><option value="in_progress">In progress</option><option value="blocked">Blocked</option><option value="done">Done</option></select></div></div>
+              <div className="rounded-card bg-sticky-lavender/20 border border-sticky-lavender p-4"><div className="flex items-center gap-2"><p className="font-bold text-sm">Suggested owner: {suggestion.suggested_owner_name || 'No supported suggestion'}</p><ConfidencePill score={suggestion.assignment_confidence} /></div><p className="text-xs text-ink-muted mt-2">{suggestion.assignment_reason}</p></div>
+              {createdTask && <div><label className="label">Choose owner</label><select className="select" value={selectedOwner} onChange={(e) => setSelectedOwner(e.target.value)}><option value="">Unassigned</option>{members.map((member) => { const user = member.user; return user ? <option key={member.user_id} value={member.user_id}>{user.display_name}{user.github_login ? ` (@${user.github_login})` : ''}</option> : null; })}</select></div>}
+              <div className="flex justify-end gap-2 pt-3 border-t border-border">{!createdTask ? <><button className="btn-ghost" onClick={() => setReviewing(false)}>Cancel</button><button className="btn-primary" onClick={createTask}>Create task</button></> : <><button className="btn-secondary" onClick={() => { setReviewing(false); onRemove(gap.id); }}>Leave unassigned</button><button className="btn-primary" disabled={!selectedOwner} onClick={assignTask}>Assign</button></>}</div>
+            </div>}
           </div>
-        )}
-      </div>
-    </article>
+        </div>
+      )}
+    </>
   );
 }
 function NextStepCard({ step }: { step: SuggestedNextStep }) {
@@ -211,6 +231,7 @@ export default function ProjectIntelligencePage() {
   const demo = isDemoMode();
   const [hiddenGapIds, setHiddenGapIds] = useState<Set<number>>(new Set());
   const [editedGaps, setEditedGaps] = useState<Map<number, DetectedGap>>(new Map());
+  const [mode, setMode] = useState<AutomationMode>('suggest');
 
   const { data: status } = useQuery({
     queryKey: ['intelligence-status', projectId],
@@ -226,13 +247,16 @@ export default function ProjectIntelligencePage() {
     isPending,
     error,
     mutate: runAnalysis,
-  } = useMutation<ProjectAnalysis, Error>({
-    mutationFn: () => demo ? Promise.resolve(DEMO_PROJECT_ANALYSIS) : analyzeProject(projectId!),
+  } = useMutation<ProjectRefreshResponse, Error>({
+    mutationFn: () => demo ? Promise.resolve({ analysis: DEMO_PROJECT_ANALYSIS, changes: [], taskProposals: [], automationMode: mode, refreshedAt: new Date().toISOString(), baselineCreated: true }) : refreshProjectIntelligence(projectId!),
+    onSuccess: (result) => setMode(result.automationMode),
   });
 
-  const hasResults = !!analysis;
-  const ps = analysis?.projectState;
-  const activeGaps = (analysis?.detectedGaps ?? [])
+  const refresh = analysis;
+  const report = refresh?.analysis;
+  const hasResults = !!report;
+  const ps = report?.projectState;
+  const activeGaps = (report?.detectedGaps ?? [])
     .filter((gap) => gap.id === undefined || !hiddenGapIds.has(gap.id))
     .map((gap) => gap.id !== undefined ? (editedGaps.get(gap.id) ?? gap) : gap);
 
@@ -272,6 +296,12 @@ export default function ProjectIntelligencePage() {
       </div>
 
       {/* ── Disclaimer banner ───────────────────────────────── */}
+      <div className="mb-5 flex items-center justify-between gap-3 flex-wrap">
+        <div><p className="text-xs font-bold text-ink">Automation mode</p><p className="text-xs text-ink-muted">Suggest is the safe default. Task status changes always require approval.</p></div>
+        <select className="select w-auto" value={mode} onChange={async (e) => { const next = e.target.value as AutomationMode; const previous = mode; setMode(next); if (!demo) { try { await setAutomationMode(projectId!, next); toast.success(`Automation mode: ${next}`); } catch { setMode(previous); toast.error('Could not update automation mode. Please try again.'); } } }}>
+          <option value="observe">Observe</option><option value="suggest">Suggest</option><option value="autopilot">Autopilot</option>
+        </select>
+      </div>
       <div className="mb-6 flex items-start gap-2.5 bg-sticky-yellow/20 border border-sticky-yellow/40 rounded-card px-4 py-3">
         <Sparkles className="w-4 h-4 text-ink-muted flex-shrink-0 mt-0.5" />
         <p className="text-xs text-ink-soft leading-snug">
@@ -285,7 +315,7 @@ export default function ProjectIntelligencePage() {
       {!hasResults && !isPending && (
         <div className="card-editorial p-8 text-center mb-8">
           <Brain className="w-10 h-10 text-ink-faint mx-auto mb-4" />
-          <h2 className="text-lg font-bold text-ink mb-2">Analyse This Project</h2>
+          <h2 className="text-lg font-bold text-ink mb-2">Update This Project</h2>
           <p className="text-sm text-ink-muted mb-6 max-w-sm mx-auto">
             MEMO will collect GitHub evidence — commits, PRs, issues, branches — and use
             {status?.available ? ' watsonx.ai' : ' built-in heuristics'} to understand
@@ -296,7 +326,7 @@ export default function ProjectIntelligencePage() {
             onClick={() => runAnalysis()}
           >
             <Search className="w-4 h-4" />
-            Run Analysis
+            Update Project
           </button>
         </div>
       )}
@@ -308,7 +338,7 @@ export default function ProjectIntelligencePage() {
             <Brain className="w-6 h-6 text-ink animate-pulse" />
           </div>
           <p className="text-sm text-ink-muted">
-            Collecting evidence and analysing…
+            Fetching new GitHub activity and updating intelligence…
           </p>
           <p className="text-xs text-ink-faint">This may take up to 30 seconds.</p>
         </div>
@@ -336,23 +366,30 @@ export default function ProjectIntelligencePage() {
           {/* Meta bar */}
           <div className="flex items-center justify-between mb-5 flex-wrap gap-2">
             <div className="flex items-center gap-2 text-xs text-ink-faint">
-              {analysis.isFallback ? (
+              {report.isFallback ? (
                 <span className="text-yellow-600">⚡ Fallback analysis (no AI)</span>
               ) : (
-                <span className="text-green-600">✦ Generated by {formatModelId(analysis.modelId)}</span>
+                <span className="text-green-600">✦ Generated by {formatModelId(report.modelId)}</span>
               )}
               <span>·</span>
-              <span>{new Date(analysis.generatedAt).toLocaleTimeString()}</span>
+              <span>{new Date(report.generatedAt).toLocaleTimeString()}</span>
             </div>
             <button
               className="btn-ghost text-xs"
               onClick={() => runAnalysis()}
               disabled={isPending}
             >
-              <RefreshCw className="w-3 h-3" /> Refresh
+              <RefreshCw className="w-3 h-3" /> Update Project
             </button>
           </div>
 
+          {refresh && (
+            <div className="card p-5 mb-6">
+              <p className="section-heading mb-3">Since your last update</p>
+              {refresh.baselineCreated ? <p className="text-sm text-ink-muted">Baseline saved. Future updates will show only meaningful changes.</p> : refresh.changes.length ? <div className="space-y-3">{refresh.changes.map((change, index) => <div key={`${change.kind}-${index}`} className="flex gap-3"><CheckCircle className="w-4 h-4 text-green-500 mt-0.5 flex-shrink-0"/><div><p className="text-sm font-semibold">{change.title}</p><p className="text-xs text-ink-muted">{change.description}</p>{change.evidence.length > 0 && <p className="text-[11px] font-mono text-ink-faint mt-1">{change.evidence.join(' · ')}</p>}</div></div>)}</div> : <p className="text-sm text-ink-muted">No meaningful GitHub changes detected.</p>}
+            </div>
+          )}
+          {refresh?.taskProposals.map((proposal) => <div key={proposal.id} className="card border-sticky-yellow p-5 mb-4"><p className="text-[10px] font-black tracking-widest text-sticky-orange">TASK MAY BE COMPLETE</p><h3 className="font-bold mt-1">{proposal.task_title}</h3><p className="text-sm text-ink-muted mt-2">{proposal.reason}</p><EvidenceList evidence={proposal.evidence}/><div className="flex gap-2 mt-4"><button className="btn-primary text-xs" onClick={async () => { await approveTaskUpdate(projectId!, proposal.id); toast.success('Task marked done'); runAnalysis(); }}>Mark done</button><button className="btn-ghost text-xs" onClick={async () => { await dismissTaskUpdate(projectId!, proposal.id); toast.success('Suggestion dismissed'); runAnalysis(); }}>Dismiss</button></div></div>)}
           {/* Project state grid */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 mb-8">
 
@@ -453,7 +490,7 @@ export default function ProjectIntelligencePage() {
           )}
 
           {/* Suggested Next Steps */}
-          {analysis.suggestedNextSteps.length > 0 && (
+          {report.suggestedNextSteps.length > 0 && (
             <div className="mb-8">
               <h2 className="text-base font-bold text-ink mb-1 flex items-center gap-2">
                 <Zap className="w-4 h-4 text-sticky-yellow" />
@@ -463,7 +500,7 @@ export default function ProjectIntelligencePage() {
                 MEMO suggests these actions based on the current project state.
               </p>
               <div className="space-y-3">
-                {analysis.suggestedNextSteps.map((step, i) => (
+                {report.suggestedNextSteps.map((step, i) => (
                   <NextStepCard key={i} step={step} />
                 ))}
               </div>
@@ -472,7 +509,7 @@ export default function ProjectIntelligencePage() {
 
           {/* Empty state */}
           {!ps?.completed.length && !ps?.inProgress.length && !ps?.blocked.length
-           && !activeGaps.length && !analysis.suggestedNextSteps.length && (
+           && !activeGaps.length && !report.suggestedNextSteps.length && (
             <div className="card p-8 text-center mb-8">
               <p className="text-sm text-ink-muted">
                 MEMO could not detect any project state from the available evidence.

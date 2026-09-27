@@ -6,6 +6,7 @@ from sqlalchemy.engine import Connection
 
 from alembic import context
 from sqlmodel import SQLModel
+from app.core.config import settings
 
 # Import all models so Alembic can detect them
 from app.models.models import (  # noqa: F401
@@ -15,8 +16,8 @@ from app.models.models import (  # noqa: F401
 
 config = context.config
 
-# Override URL from environment
-db_url = os.getenv("DATABASE_URL", config.get_main_option("sqlalchemy.url"))
+# Use the same environment-aware URL as the application.
+db_url = settings.DATABASE_URL
 # Alembic sync driver for migrations (psycopg2), convert asyncpg URL
 if db_url and "asyncpg" in db_url:
     db_url = db_url.replace("postgresql+asyncpg://", "postgresql+psycopg2://")

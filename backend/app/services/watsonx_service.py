@@ -28,6 +28,7 @@ so MEMO continues working with GitHub data and user-entered context.
 from __future__ import annotations
 
 import json
+import hashlib
 import logging
 import re
 import time
@@ -61,6 +62,9 @@ _GENERATE_URL  = "{base}/ml/v1/text/generation?version=2023-05-29"
 
 # Simple in-process IAM token cache (expires in ~1 hour)
 _iam_token_cache: Dict[str, Any] = {"token": None, "expires_at": 0}
+_generation_cache: Dict[str, Dict[str, Any]] = {}
+_GENERATION_CACHE_TTL_SECONDS = 300
+_GENERATION_CACHE_MAX_ITEMS = 100
 
 
 async def _get_iam_token() -> Optional[str]:
@@ -95,6 +99,10 @@ async def _call_watsonx(prompt: str, max_new_tokens: int = 1500) -> Optional[str
     Send a prompt to watsonx.ai and return the generated text.
     Returns None if the service is unavailable or not configured.
     """
+    cache_key = hashlib.sha256(f"{settings.WATSONX_MODEL_ID}:{max_new_tokens}:{prompt}".encode("utf-8")).hexdigest()
+    cached = _generation_cache.get(cache_key)
+    if cached and cached["expires_at"] > time.time():
+        return cached["text"]
     if not settings.WATSONX_API_KEY or not settings.WATSONX_PROJECT_ID:
         logger.debug("watsonx.ai not configured — running in fallback mode.")
         return None
@@ -129,7 +137,12 @@ async def _call_watsonx(prompt: str, max_new_tokens: int = 1500) -> Optional[str
                 data = resp.json()
                 results = data.get("results", [])
                 if results:
-                    return results[0].get("generated_text", "")
+                    generated = results[0].get("generated_text", "")
+                    if len(_generation_cache) >= _GENERATION_CACHE_MAX_ITEMS:
+                        oldest = min(_generation_cache, key=lambda key: _generation_cache[key]["expires_at"])
+                        _generation_cache.pop(oldest, None)
+                    _generation_cache[cache_key] = {"text": generated, "expires_at": time.time() + _GENERATION_CACHE_TTL_SECONDS}
+                    return generated
             else:
                 logger.warning(
                     "watsonx.ai returned HTTP %d: %s",
@@ -363,6 +376,7 @@ async def generate_memo(
     project_context: Dict[str, Any],
     existing_memo: Optional[Dict[str, Any]] = None,
     existing_tasks: Optional[List[Dict[str, Any]]] = None,
+    manual_context: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     """
     Generate a structured developer handoff memo from the project context.
@@ -381,6 +395,9 @@ PREVIOUS MEMO:
 
 CURRENT TASKS:
 {_tasks_summary(existing_tasks or [])}
+
+DEVELOPER-ENTERED CONTEXT (authoritative; preserve it and only enrich unsupported gaps):
+{_memo_summary(manual_context)}
 
 Produce ONLY a JSON object (no markdown, no extra commentary):
 {{

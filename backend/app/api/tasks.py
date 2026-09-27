@@ -1,6 +1,7 @@
 """
 Task routes — CRUD, Kanban status, Memo-to-task conversion.
 """
+import json
 from typing import List, Optional
 from datetime import datetime, timezone
 
@@ -41,6 +42,12 @@ def _task_to_read(task: Task, assignee: Optional[User] = None, gh_login: Optiona
         status=task.status,
         priority=task.priority,
         github_issue_url=task.github_issue_url,
+        source_type=task.source_type,
+        source_gap_id=task.source_gap_id,
+        source_evidence=json.loads(task.source_evidence_json or "[]"),
+        ai_generated=task.ai_generated,
+        assignment_reason=task.assignment_reason,
+        assignment_confidence=task.assignment_confidence,
         position=task.position,
         created_at=task.created_at,
         updated_at=task.updated_at,

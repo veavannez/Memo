@@ -1,9 +1,9 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '../lib/api';
-import { DEMO_TASKS, DEMO_MEMBERS, isDemoMode } from '../lib/demo';
-import type { Task, TaskStatus, TaskPriority, ProjectMember } from '../types';
+import { DEMO_TASKS, isDemoMode } from '../lib/demo';
+import type { Task, TaskStatus, TaskPriority } from '../types';
 import {
   statusBadgeClass, priorityBadgeClass, getStatusLabel, getPriorityLabel, timeAgo,
 } from '../lib/utils';
@@ -37,15 +37,6 @@ export default function TasksPage() {
       return api
         .get(`/projects/${projectId}/tasks${filterStatus ? `?status=${filterStatus}` : ''}`)
         .then((r) => r.data);
-    },
-    enabled: !!projectId,
-  });
-
-  const { data: members = [] } = useQuery<ProjectMember[]>({
-    queryKey: ['members', projectId],
-    queryFn: () => {
-      if (isDemo) return Promise.resolve(DEMO_MEMBERS);
-      return api.get(`/projects/${projectId}/members`).then((r) => r.data);
     },
     enabled: !!projectId,
   });

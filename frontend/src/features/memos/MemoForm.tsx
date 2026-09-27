@@ -6,10 +6,10 @@ import type { Memo, SessionContext } from '../../types';
 import {
   GitCommit, GitPullRequest, GitBranch, FileCode, AlertCircle,
   ExternalLink, ChevronDown, ChevronUp, CheckCircle2, Circle,
-  ArrowRight, Clock,
+  ArrowRight, Clock, Sparkles,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { timeAgo } from '../../lib/utils';
+import { generateMemoDraft } from '../../lib/watsonx';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface MemoFormValues {
@@ -266,6 +266,8 @@ export function MemoForm({ projectId, initial, onSuccess, onCancel, sessionConte
       : empty
   );
 
+  const [createTasks, setCreateTasks] = useState(true);
+
   // Use provided context, or demo context in demo mode, or null
   const ctx: SessionContext | null = sessionContext ?? (isDemo && !isEdit ? DEMO_SESSION_CONTEXT : null);
 
@@ -274,15 +276,28 @@ export function MemoForm({ projectId, initial, onSuccess, onCancel, sessionConte
       isEdit
         ? api.patch(`/projects/${projectId}/memos/${initial!.id}`, data).then((r) => r.data)
         : api.post(`/projects/${projectId}/memos`, data).then((r) => r.data),
-    onSuccess: (memo: Memo) => {
+    onSuccess: async (memo: Memo, submitted: MemoFormValues) => {
       queryClient.invalidateQueries({ queryKey: ['memos', projectId] });
       queryClient.invalidateQueries({ queryKey: ['dashboard', projectId] });
-      toast.success(isEdit ? 'Memo updated' : 'Session saved.');
+      if (!isEdit && !submitted.is_draft && createTasks && submitted.next_steps.trim()) {
+        const steps = submitted.next_steps.split('\n').map((line) => line.trim().replace(/^[-*\u2022]\s*/, '')).filter(Boolean);
+        if (steps.length) await api.post(`/projects/${projectId}/tasks/from-memo/${memo.id}`, { next_steps: steps, priority: 'medium' });
+        queryClient.invalidateQueries({ queryKey: ['tasks', projectId] });
+      }
+      toast.success(isEdit ? 'Memo updated' : createTasks && submitted.next_steps.trim() ? 'Handoff saved and next steps added to Todo.' : 'Handoff saved.');
       onSuccess?.(memo);
     },
     onError: () => toast.error('Failed to save memo'),
   });
 
+  const synthesis = useMutation({
+    mutationFn: () => generateMemoDraft(projectId, values),
+    onSuccess: (draft) => {
+      setValues((current) => ({ ...current, completed: current.completed || draft.completed || '', in_progress: current.in_progress || draft.in_progress || '', blocked: current.blocked || draft.blocked || '', next_steps: current.next_steps || draft.next_steps || '', notes: current.notes || draft.notes || '' }));
+      toast.success(draft.isFallback ? 'Draft assembled from GitHub evidence.' : 'watsonx.ai draft ready for review.');
+    },
+    onError: () => toast.error('Could not synthesize the handoff.'),
+  });
   const set = (key: keyof MemoFormValues) => (v: string) =>
     setValues((prev) => ({ ...prev, [key]: v }));
 
@@ -291,7 +306,7 @@ export function MemoForm({ projectId, initial, onSuccess, onCancel, sessionConte
   const FIELDS: FieldProps[] = [
     {
       id: 'completed',
-      label: 'What I finished',
+      label: 'What did you finish?',
       sublabel: 'Shipped, merged, or marked done this session',
       accent: 'border-sticky-green',
       accentBg: 'bg-sticky-green/5',
@@ -304,7 +319,7 @@ export function MemoForm({ projectId, initial, onSuccess, onCancel, sessionConte
     },
     {
       id: 'in_progress',
-      label: 'Where I left off',
+      label: 'What are you working on?',
       sublabel: 'What is actively in progress right now',
       accent: 'border-sticky-blue',
       accentBg: 'bg-sticky-blue/5',
@@ -312,13 +327,12 @@ export function MemoForm({ projectId, initial, onSuccess, onCancel, sessionConte
       value: values.in_progress,
       onChange: set('in_progress'),
       rows: 3,
-      required: true,
       icon: <ArrowRight className="w-4 h-4 text-sticky-blue" />,
       hint: 'Include the specific file or function you were editing.',
     },
     {
       id: 'blocked',
-      label: "What's blocking me",
+      label: 'What is blocking you?',
       sublabel: 'Blockers, unknowns, or things you need from someone else',
       accent: 'border-sticky-pink',
       accentBg: 'bg-sticky-pink/5',
@@ -331,7 +345,7 @@ export function MemoForm({ projectId, initial, onSuccess, onCancel, sessionConte
     },
     {
       id: 'next_steps',
-      label: 'What happens next',
+      label: 'What should happen next?',
       sublabel: 'One action per line — each becomes a task',
       accent: 'border-sticky-yellow',
       accentBg: 'bg-sticky-yellow/10',
@@ -397,15 +411,21 @@ export function MemoForm({ projectId, initial, onSuccess, onCancel, sessionConte
             <MemoField key={field.id} {...field} />
           ))}
 
+          {!isEdit && <div className="rounded-card border border-sticky-lavender bg-sticky-lavender/10 p-4 flex items-center justify-between gap-4 flex-wrap">
+            <div><p className="text-sm font-bold">Synthesize handoff with watsonx.ai</p><p className="text-xs text-ink-muted mt-0.5">Uses GitHub evidence and current tasks. Anything you typed stays unchanged.</p></div>
+            <button type="button" className="btn-secondary text-sm" onClick={() => synthesis.mutate()} disabled={synthesis.isPending}><Sparkles className="w-4 h-4" />{synthesis.isPending ? 'Assembling…' : 'Generate summary'}</button>
+          </div>}
+
+          {!isEdit && <label className="flex items-start gap-3 rounded-card border border-border p-3 cursor-pointer"><input type="checkbox" className="mt-1" checked={createTasks} onChange={(e) => setCreateTasks(e.target.checked)} /><span><span className="text-sm font-semibold block">Create Todo tasks from next steps</span><span className="text-xs text-ink-muted">Each non-empty line becomes a task linked back to this handoff.</span></span></label>}
           {/* ── Submit ────────────────────────────────────────── */}
           <div className="flex items-center gap-3 pt-2 border-t-2 border-ink/10 flex-wrap">
             <button
               type="button"
               className="btn-end-session"
               onClick={() => submit(false)}
-              disabled={mutation.isPending || (!values.in_progress.trim())}
+              disabled={mutation.isPending}
             >
-              {mutation.isPending ? 'Saving…' : isEdit ? 'Update Memo' : 'End Session →'}
+              {mutation.isPending ? 'Saving...' : isEdit ? 'Update Memo' : "I'm Done for Today"}
             </button>
             <button
               type="button"
@@ -421,12 +441,6 @@ export function MemoForm({ projectId, initial, onSuccess, onCancel, sessionConte
               </button>
             )}
           </div>
-
-          {!values.in_progress.trim() && (
-            <p className="text-xs text-ink-faint -mt-2">
-              "Where I left off" is required before you can save.
-            </p>
-          )}
         </div>
       </div>
     </div>
