@@ -3,7 +3,7 @@
  * Every component here enforces the editorial + scrapbook visual language.
  */
 import React from 'react';
-import { getInitials } from '../lib/utils';
+import { getInitials } from '../../lib/utils';
 
 // ─────────────────────────────────────────────────────────
 // SectionHeading
