@@ -92,7 +92,7 @@ function AppPreview() {
     <div className="bg-paper min-h-[340px] text-xs font-sans p-4">
       {/* mini nav */}
       <div className="flex items-center justify-between pb-3 mb-4 border-b-2 border-ink">
-        <span className="font-display font-bold text-ink text-sm" style={{ letterSpacing: '-0.02em' }}>MEMO</span>
+        <img src="/memo-logo.png" alt="MEMO" className="h-5 w-auto" />
         <div className="flex items-center gap-2">
           <span className="badge-in-progress">Live</span>
           <div className="pulse-dot" />
@@ -179,9 +179,7 @@ export default function LandingPage() {
       <nav className="border-b-2 border-ink bg-paper-cream/95 sticky top-0 z-50" style={{ backdropFilter: 'blur(10px)' }}>
         <div className="max-w-6xl mx-auto px-5 sm:px-8 flex items-center justify-between h-14 gap-6">
           {/* Logo */}
-          <span className="font-display text-ink flex-shrink-0" style={{ fontWeight: 800, fontSize: '1.3rem', letterSpacing: '-0.035em' }}>
-            MEMO
-          </span>
+          <img src="/memo-logo.png" alt="MEMO" className="h-9 w-auto flex-shrink-0" />
 
           {/* Centre links */}
           <div className="hidden md:flex items-center gap-1">
@@ -268,7 +266,7 @@ export default function LandingPage() {
               </Link>
             </div>
 
-            {/* Social proof */}
+            {/* Social proof — sits below CTA */}
             <div className="fade-up-4 flex items-center gap-4 pt-5 border-t border-border">
               <div className="flex -space-x-2">
                 {['A','S','J','M','R'].map((l, i) => (
@@ -526,7 +524,7 @@ export default function LandingPage() {
       {/* ── FOOTER ───────────────────────────────────────── */}
       <footer className="bg-ink border-t border-ink/20">
         <div className="max-w-6xl mx-auto px-5 sm:px-8 py-8 flex flex-col sm:flex-row items-center justify-between gap-4">
-          <span className="font-display font-bold text-paper-cream text-lg" style={{ letterSpacing: '-0.03em' }}>MEMO</span>
+          <img src="/memo-logo.png" alt="MEMO" className="h-8 w-auto brightness-0 invert" />
           <div className="flex items-center gap-6">
             <Link to="/demo" className="text-xs text-paper-dark hover:text-paper-cream transition-colors font-display">Demo</Link>
             <a href="https://github.com/veavannez/Memo" target="_blank" rel="noopener noreferrer" className="text-xs text-paper-dark hover:text-paper-cream transition-colors font-display">GitHub</a>

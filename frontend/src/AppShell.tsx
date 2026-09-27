@@ -52,10 +52,9 @@ function AppShell() {
             <div className="flex items-center gap-2 min-w-0">
               <Link
                 to="/projects"
-                className="font-display text-ink flex-shrink-0 hover:opacity-70 transition-opacity active:scale-95"
-                style={{ fontWeight: 800, fontSize: '1.2rem', letterSpacing: '-0.035em' }}
+                className="flex-shrink-0 hover:opacity-70 transition-opacity active:scale-95"
               >
-                MEMO
+                <img src="/memo-logo.png" alt="MEMO" className="h-8 w-auto" />
               </Link>
 
               {project && (
