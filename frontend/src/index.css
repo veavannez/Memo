@@ -2,18 +2,166 @@
 @tailwind components;
 @tailwind utilities;
 
-/* ─────────────────────────────────────────────────────────
-   BASE — Paper background, ink text, editorial defaults
-───────────────────────────────────────────────────────── */
+/* ═══════════════════════════════════════════════════════════
+   KEYFRAMES — every animation in one place
+═══════════════════════════════════════════════════════════ */
+
+/* Sticky note entrances — spring physics feel */
+@keyframes sticky-in-1 {
+  0%   { opacity:0; transform: translateY(-80px) rotate(-12deg) scale(0.6); }
+  55%  { opacity:1; transform: translateY(8px)   rotate(2deg)   scale(1.05);}
+  75%  { transform: translateY(-4px) rotate(-1deg) scale(0.97); }
+  100% { opacity:1; transform: translateY(0)     rotate(-2deg)  scale(1);   }
+}
+@keyframes sticky-in-2 {
+  0%   { opacity:0; transform: translateY(80px)  rotate(10deg)  scale(0.6); }
+  55%  { opacity:1; transform: translateY(-6px)  rotate(-2deg)  scale(1.05);}
+  75%  { transform: translateY(3px) rotate(2deg) scale(0.97); }
+  100% { opacity:1; transform: translateY(0)     rotate(1.5deg) scale(1);   }
+}
+@keyframes sticky-in-3 {
+  0%   { opacity:0; transform: translateX(100px) rotate(12deg)  scale(0.6); }
+  55%  { opacity:1; transform: translateX(-6px)  rotate(-2deg)  scale(1.05);}
+  75%  { transform: translateX(3px) rotate(1deg) scale(0.97); }
+  100% { opacity:1; transform: translateX(0)     rotate(3deg)   scale(1);   }
+}
+@keyframes sticky-in-4 {
+  0%   { opacity:0; transform: translateX(-80px) rotate(-10deg) scale(0.6); }
+  55%  { opacity:1; transform: translateX(6px)   rotate(2deg)   scale(1.05);}
+  75%  { transform: translateX(-3px) rotate(-1deg) scale(0.97); }
+  100% { opacity:1; transform: translateX(0)     rotate(-3deg)  scale(1);   }
+}
+@keyframes sticky-in-5 {
+  0%   { opacity:0; transform: translateY(60px) rotate(-8deg)  scale(0.65);}
+  55%  { opacity:1; transform: translateY(-5px) rotate(2deg)   scale(1.04);}
+  100% { opacity:1; transform: translateY(0)    rotate(2.5deg) scale(1);   }
+}
+
+/* Continuous idle drift — each unique */
+@keyframes drift-1 { 0%,100%{transform:rotate(-2deg) translateY(0);}  40%{transform:rotate(-1deg) translateY(-5px);} 70%{transform:rotate(-3deg) translateY(3px);} }
+@keyframes drift-2 { 0%,100%{transform:rotate(1.5deg) translateY(0);} 40%{transform:rotate(2.5deg) translateY(-4px);}70%{transform:rotate(0deg) translateY(4px); } }
+@keyframes drift-3 { 0%,100%{transform:rotate(3deg) translateY(0);}   50%{transform:rotate(2deg) translateY(-6px);}                                               }
+@keyframes drift-4 { 0%,100%{transform:rotate(-3deg) translateY(0);}  50%{transform:rotate(-2deg) translateY(5px);}                                               }
+@keyframes drift-5 { 0%,100%{transform:rotate(2.5deg) translateY(0);} 33%{transform:rotate(1deg) translateY(-3px);} 66%{transform:rotate(3.5deg) translateY(2px);}  }
+
+/* Hero text stagger */
+@keyframes word-rise {
+  0%   { opacity:0; transform:translateY(40px) skewY(4deg); clip-path: inset(0 0 100% 0); }
+  100% { opacity:1; transform:translateY(0)    skewY(0deg); clip-path: inset(0 0 0% 0);   }
+}
+
+/* Fade up — general sections */
+@keyframes fade-up {
+  from { opacity:0; transform:translateY(28px); }
+  to   { opacity:1; transform:translateY(0);    }
+}
+
+/* Horizontal marquee ticker */
+@keyframes marquee {
+  from { transform: translateX(0); }
+  to   { transform: translateX(-50%); }
+}
+
+/* Pulse dot — live indicator */
+@keyframes pulse-dot {
+  0%,100% { transform:scale(1);   opacity:1;   }
+  50%     { transform:scale(1.6); opacity:0.5; }
+}
+
+/* Nav underline slide in */
+@keyframes nav-underline {
+  from { transform: scaleX(0); }
+  to   { transform: scaleX(1); }
+}
+
+/* Card tilt on hover — handled via JS for cursor tracking */
+@keyframes card-appear {
+  from { opacity:0; transform:scale(0.94) translateY(12px); }
+  to   { opacity:1; transform:scale(1)    translateY(0);    }
+}
+
+/* Shimmer on CTA button */
+@keyframes shimmer {
+  0%   { background-position: -200% center; }
+  100% { background-position: 200%  center; }
+}
+
+/* Cursor glow follow — used with JS */
+@keyframes glow-fade {
+  from { opacity: 0.18; }
+  to   { opacity: 0;    }
+}
+
+/* ═══════════════════════════════════════════════════════════
+   ANIMATION UTILITY CLASSES
+═══════════════════════════════════════════════════════════ */
+
+/* Sticky note combos: fly-in + idle drift */
+.sticky-anim-1 { animation: sticky-in-1 .75s cubic-bezier(.34,1.56,.64,1) .15s both, drift-1 6.5s ease-in-out 1s infinite; }
+.sticky-anim-2 { animation: sticky-in-2 .75s cubic-bezier(.34,1.56,.64,1) .30s both, drift-2 7.5s ease-in-out 1.2s infinite; }
+.sticky-anim-3 { animation: sticky-in-3 .75s cubic-bezier(.34,1.56,.64,1) .50s both, drift-3 9s ease-in-out 1.5s infinite; }
+.sticky-anim-4 { animation: sticky-in-4 .75s cubic-bezier(.34,1.56,.64,1) .08s both, drift-4 5.5s ease-in-out .8s infinite; }
+.sticky-anim-5 { animation: sticky-in-5 .75s cubic-bezier(.34,1.56,.64,1) .65s both, drift-5 8s ease-in-out 1.8s infinite; }
+
+/* Staggered hero words */
+.word-rise   { display:inline-block; overflow:hidden; animation: word-rise .65s cubic-bezier(.22,1,.36,1) both; }
+.word-rise-1 { animation-delay: .05s; }
+.word-rise-2 { animation-delay: .18s; }
+.word-rise-3 { animation-delay: .30s; }
+.word-rise-4 { animation-delay: .42s; }
+.word-rise-5 { animation-delay: .54s; }
+
+/* General fade-up stagger */
+.fade-up-1 { animation: fade-up .55s ease .4s  both; }
+.fade-up-2 { animation: fade-up .55s ease .55s both; }
+.fade-up-3 { animation: fade-up .55s ease .70s both; }
+.fade-up-4 { animation: fade-up .55s ease .85s both; }
+.fade-up-5 { animation: fade-up .55s ease 1.0s both; }
+
+/* Live pulse dot */
+.pulse-dot {
+  @apply w-2 h-2 rounded-full bg-sticky-green;
+  animation: pulse-dot 1.8s ease-in-out infinite;
+}
+
+/* Marquee ticker */
+.marquee-wrap { overflow: hidden; }
+.marquee-track {
+  display: flex;
+  width: max-content;
+  animation: marquee 28s linear infinite;
+}
+.marquee-track:hover { animation-play-state: paused; }
+
+/* Dot grid background */
+.bg-dot-grid {
+  background-image: radial-gradient(circle, #C4BFB4 1px, transparent 1px);
+  background-size: 24px 24px;
+}
+
+/* Shimmer button */
+.btn-shimmer {
+  background: linear-gradient(
+    110deg,
+    #F5E642 0%, #F5E642 35%,
+    #fff8a0 50%,
+    #F5E642 65%, #F5E642 100%
+  );
+  background-size: 200% auto;
+  animation: shimmer 2.8s linear infinite;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   BASE
+═══════════════════════════════════════════════════════════ */
 @layer base {
-  *, *::before, *::after {
-    box-sizing: border-box;
-  }
+  *, *::before, *::after { box-sizing: border-box; }
 
   html {
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     text-rendering: optimizeLegibility;
+    scroll-behavior: smooth;
   }
 
   body {
@@ -22,6 +170,7 @@
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
     font-size: 15px;
     line-height: 1.6;
+    cursor: default;
   }
 
   h1, h2, h3, h4, h5, h6 {
@@ -32,36 +181,35 @@
     letter-spacing: -0.02em;
   }
 
-  ::selection {
-    background: #F5E642;
-    color: #0F0F0F;
-  }
+  ::selection { background: #F5E642; color: #0F0F0F; }
 
-  /* Scrollbar styling */
   ::-webkit-scrollbar { width: 6px; height: 6px; }
   ::-webkit-scrollbar-track { background: #EDE9DF; }
   ::-webkit-scrollbar-thumb { background: #C4BFB4; border-radius: 3px; }
   ::-webkit-scrollbar-thumb:hover { background: #9E9990; }
+
+  /* Focus rings use ink color */
+  :focus-visible { outline: 2px solid #0F0F0F; outline-offset: 3px; border-radius: 2px; }
 }
 
-/* ─────────────────────────────────────────────────────────
+/* ═══════════════════════════════════════════════════════════
    TYPOGRAPHY UTILITIES
-───────────────────────────────────────────────────────── */
+═══════════════════════════════════════════════════════════ */
 @layer utilities {
   .font-display { font-family: 'Space Grotesk', 'Inter', system-ui, sans-serif; }
 
   .text-display-2xl {
     font-family: 'Space Grotesk', system-ui, sans-serif;
-    font-size: clamp(3rem, 8vw, 7rem);
-    line-height: 0.95;
-    letter-spacing: -0.03em;
+    font-size: clamp(3.2rem, 9vw, 7.5rem);
+    line-height: 0.92;
+    letter-spacing: -0.035em;
     font-weight: 800;
   }
   .text-display-xl {
     font-family: 'Space Grotesk', system-ui, sans-serif;
     font-size: clamp(2.2rem, 5vw, 4.5rem);
     line-height: 1.0;
-    letter-spacing: -0.025em;
+    letter-spacing: -0.028em;
     font-weight: 800;
   }
   .text-display-lg {
@@ -73,27 +221,17 @@
   }
   .text-display-md {
     font-family: 'Space Grotesk', system-ui, sans-serif;
-    font-size: clamp(1.1rem, 2vw, 1.6rem);
+    font-size: clamp(1.05rem, 1.8vw, 1.5rem);
     line-height: 1.15;
     letter-spacing: -0.015em;
     font-weight: 700;
   }
 
-  /* Horizontal rule — editorial divider */
-  .rule { @apply border-t border-border; }
-  .rule-strong { @apply border-t border-ink; }
-
-  /* Grain texture overlay for sticky notes */
-  .paper-texture {
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
-  }
-
-  /* Underline accent — editorial highlight */
   .underline-yellow {
     text-decoration: underline;
     text-decoration-color: #F5E642;
-    text-decoration-thickness: 4px;
-    text-underline-offset: 3px;
+    text-decoration-thickness: 6px;
+    text-underline-offset: 4px;
   }
   .underline-ink {
     text-decoration: underline;
@@ -103,242 +241,240 @@
   }
 }
 
-/* ─────────────────────────────────────────────────────────
-   COMPONENT CLASSES
-───────────────────────────────────────────────────────── */
+/* ═══════════════════════════════════════════════════════════
+   COMPONENTS
+═══════════════════════════════════════════════════════════ */
 @layer components {
 
-  /* ── CARDS ─────────────────────────────────────────── */
-
-  /* Standard content card */
+  /* ── CARDS ───────────────────────────────────────────── */
   .card {
-    @apply bg-paper-cream rounded-card border border-border;
+    @apply bg-paper-cream rounded-card border border-border
+           transition-all duration-200;
   }
-
-  /* Editorial card — strong black border + offset shadow */
+  .card-interactive {
+    @apply card cursor-pointer
+           hover:-translate-y-1 hover:shadow-editorial-sm hover:border-ink/40;
+  }
   .card-editorial {
-    @apply bg-paper-cream rounded-editorial border-2 border-ink shadow-editorial;
+    @apply bg-paper-cream rounded-editorial border-2 border-ink shadow-editorial
+           transition-all duration-150;
   }
-
-  /* Collage card — slight rotation, sticky feel */
+  .card-editorial:hover {
+    @apply shadow-editorial-lg -translate-y-0.5;
+  }
   .card-collage {
-    @apply bg-paper-cream rounded-card border border-border shadow-lift transition-transform duration-200;
+    @apply bg-paper-cream rounded-card border border-border shadow-lift
+           transition-all duration-200 cursor-pointer;
   }
   .card-collage:hover {
-    @apply -translate-y-0.5 shadow-editorial-sm;
+    @apply -translate-y-1 shadow-editorial-sm border-ink/50;
   }
 
-  /* Sticky note card */
+  /* ── STICKY NOTES ────────────────────────────────────── */
   .sticky {
     @apply rounded-sticky border border-black/10 shadow-sticky p-4 text-ink font-sans;
     font-size: 13px;
     line-height: 1.5;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
   }
-  .sticky-yellow  { @apply sticky bg-sticky-yellow; }
-  .sticky-green   { @apply sticky bg-sticky-green; }
-  .sticky-pink    { @apply sticky bg-sticky-pink; }
-  .sticky-blue    { @apply sticky bg-sticky-blue; }
-  .sticky-orange  { @apply sticky bg-sticky-orange; }
+  .sticky:hover {
+    box-shadow: 3px 5px 14px rgba(0,0,0,0.18);
+    transform: scale(1.03);
+  }
+  .sticky-yellow   { @apply sticky bg-sticky-yellow;   }
+  .sticky-green    { @apply sticky bg-sticky-green;    }
+  .sticky-pink     { @apply sticky bg-sticky-pink;     }
+  .sticky-blue     { @apply sticky bg-sticky-blue;     }
+  .sticky-orange   { @apply sticky bg-sticky-orange;   }
   .sticky-lavender { @apply sticky bg-sticky-lavender; }
 
-  /* Browser frame — wraps UI screenshots/demos */
+  /* ── BROWSER FRAME ───────────────────────────────────── */
   .browser-frame {
     @apply rounded-card border-2 border-ink overflow-hidden shadow-editorial-lg;
   }
   .browser-chrome {
     @apply bg-paper-dark px-3 py-2 flex items-center gap-2 border-b-2 border-ink;
   }
-  .browser-dot {
-    @apply w-3 h-3 rounded-full border border-black/20;
-  }
+  .browser-dot { @apply w-3 h-3 rounded-full border border-black/20; }
 
-  /* ── BUTTONS ────────────────────────────────────────── */
-
+  /* ── BUTTONS ─────────────────────────────────────────── */
   .btn {
     @apply inline-flex items-center justify-center gap-2 font-semibold text-sm
-           transition-all duration-150 select-none cursor-pointer
-           focus:outline-none focus-visible:ring-2 focus-visible:ring-ink focus-visible:ring-offset-2 focus-visible:ring-offset-paper;
+           select-none cursor-pointer transition-all duration-150
+           focus-visible:ring-2 focus-visible:ring-ink focus-visible:ring-offset-2;
   }
-
-  /* Primary — black editorial button */
   .btn-primary {
     @apply btn bg-ink text-paper-cream border-2 border-ink rounded-editorial
            px-5 py-2.5 shadow-editorial-sm
-           hover:shadow-none hover:translate-x-0.5 hover:translate-y-0.5;
+           hover:shadow-none hover:translate-x-0.5 hover:translate-y-0.5
+           active:scale-95;
   }
-
-  /* Secondary — paper + black border */
   .btn-secondary {
     @apply btn bg-paper-cream text-ink border-2 border-ink rounded-editorial
            px-5 py-2.5 shadow-editorial-sm
-           hover:shadow-none hover:translate-x-0.5 hover:translate-y-0.5;
+           hover:shadow-none hover:translate-x-0.5 hover:translate-y-0.5
+           active:scale-95;
   }
-
-  /* Yellow accent — the most prominent CTA */
   .btn-accent {
-    @apply btn bg-sticky-yellow text-ink border-2 border-ink rounded-editorial
+    @apply btn text-ink border-2 border-ink rounded-editorial
            px-5 py-2.5 shadow-editorial-sm font-bold
-           hover:shadow-none hover:translate-x-0.5 hover:translate-y-0.5;
+           hover:shadow-none hover:translate-x-0.5 hover:translate-y-0.5
+           active:scale-95;
   }
-
-  /* Ghost — no background */
   .btn-ghost {
     @apply btn bg-transparent text-ink-muted border border-transparent rounded-card
-           px-3 py-2 hover:bg-paper-dark hover:text-ink;
+           px-3 py-2 hover:bg-paper-dark hover:text-ink active:scale-95;
   }
-
-  /* Danger */
   .btn-danger {
     @apply btn bg-sticky-pink text-ink border-2 border-ink rounded-editorial
            px-5 py-2.5 shadow-editorial-sm
-           hover:shadow-none hover:translate-x-0.5 hover:translate-y-0.5;
+           hover:shadow-none hover:translate-x-0.5 hover:translate-y-0.5
+           active:scale-95;
   }
-
-  /* Icon button */
   .btn-icon {
     @apply btn bg-transparent text-ink-muted border border-border rounded-card
-           p-2 hover:bg-paper-dark hover:text-ink hover:border-ink;
+           p-2 hover:bg-paper-dark hover:text-ink hover:border-ink active:scale-90;
   }
 
-  /* ── FORM CONTROLS ──────────────────────────────────── */
-
+  /* ── FORM CONTROLS ───────────────────────────────────── */
   .input {
     @apply w-full rounded-editorial border-2 border-border bg-paper-cream
-           px-3 py-2 text-sm text-ink font-sans
+           px-3 py-2 text-sm text-ink
            focus:border-ink focus:outline-none
            placeholder:text-ink-faint
-           transition-colors duration-150;
+           transition-all duration-150;
   }
+  .input:focus { box-shadow: 3px 3px 0px #0F0F0F; }
+  .textarea { @apply input resize-none leading-relaxed; min-height: 100px; }
+  .label { @apply block text-xs font-semibold text-ink-muted uppercase tracking-widest mb-1.5 font-display; }
+  .select { @apply input appearance-none cursor-pointer; }
 
-  .textarea {
-    @apply input resize-none leading-relaxed;
-    min-height: 100px;
-  }
-
-  .label {
-    @apply block text-xs font-semibold text-ink-muted uppercase tracking-widest mb-1.5 font-display;
-  }
-
-  .select {
-    @apply input appearance-none cursor-pointer;
-  }
-
-  /* ── BADGES / TAGS ──────────────────────────────────── */
-
+  /* ── BADGES ──────────────────────────────────────────── */
   .badge {
     @apply inline-flex items-center gap-1 px-2 py-0.5 rounded-editorial
            text-xs font-semibold border font-mono uppercase tracking-wide;
   }
+  .badge-todo        { @apply badge bg-paper-dark    text-ink-muted border-border; }
+  .badge-in-progress { @apply badge bg-sticky-blue   text-ink       border-ink/20; }
+  .badge-blocked     { @apply badge bg-sticky-pink   text-ink       border-ink/20; }
+  .badge-done        { @apply badge bg-sticky-green  text-ink       border-ink/20; }
+  .badge-high        { @apply badge bg-sticky-pink   text-ink       border-ink/20; }
+  .badge-medium      { @apply badge bg-sticky-orange text-ink       border-ink/20; }
+  .badge-low         { @apply badge bg-paper-dark    text-ink-muted border-border;  }
+  .badge-owner       { @apply badge bg-sticky-lavender text-ink     border-ink/20; }
+  .badge-member      { @apply badge bg-paper-dark    text-ink-muted border-border;  }
 
-  /* Status badges */
-  .badge-todo       { @apply badge bg-paper-dark  text-ink-muted  border-border; }
-  .badge-in-progress{ @apply badge bg-sticky-blue  text-ink       border-ink/20; }
-  .badge-blocked    { @apply badge bg-sticky-pink  text-ink       border-ink/20; }
-  .badge-done       { @apply badge bg-sticky-green text-ink       border-ink/20; }
-
-  /* Priority badges */
-  .badge-high       { @apply badge bg-sticky-pink   text-ink border-ink/20; }
-  .badge-medium     { @apply badge bg-sticky-orange text-ink border-ink/20; }
-  .badge-low        { @apply badge bg-paper-dark    text-ink-muted border-border; }
-
-  /* Role badges */
-  .badge-owner      { @apply badge bg-sticky-lavender text-ink border-ink/20; }
-  .badge-member     { @apply badge bg-paper-dark text-ink-muted border-border; }
-
-  /* ── NAVIGATION ─────────────────────────────────────── */
-
+  /* ── NAVIGATION ──────────────────────────────────────── */
   .nav-root {
     @apply bg-paper-cream border-b-2 border-ink sticky top-0 z-50;
+    backdrop-filter: blur(8px);
   }
-
   .nav-link {
-    @apply flex items-center gap-1.5 px-3 py-2.5 text-sm font-semibold
+    @apply relative flex items-center gap-1.5 px-3 py-2.5 text-sm font-semibold
            text-ink-muted border-b-2 border-transparent
-           hover:text-ink transition-colors duration-150;
+           transition-all duration-200 hover:text-ink;
     font-family: 'Space Grotesk', system-ui, sans-serif;
   }
-
+  .nav-link::after {
+    content: '';
+    @apply absolute bottom-0 left-0 w-full h-0.5 bg-ink scale-x-0 transition-transform duration-200 origin-left;
+  }
+  .nav-link:hover::after { transform: scaleX(1); }
   .nav-link-active {
     @apply nav-link text-ink border-ink;
   }
+  .nav-link-active::after { transform: scaleX(1); }
 
-  /* ── SECTION HEADING ────────────────────────────────── */
-
+  /* ── SECTION HEADING ─────────────────────────────────── */
   .section-heading {
     @apply text-xs font-bold uppercase tracking-[0.15em] text-ink-muted mb-3;
     font-family: 'Space Grotesk', system-ui, sans-serif;
   }
 
-  /* ── MEMO SECTIONS ──────────────────────────────────── */
-
-  .memo-section {
-    @apply border-l-4 border-ink pl-4 py-1 mb-4;
-  }
-  .memo-section-completed  { @apply memo-section border-sticky-green; }
-  .memo-section-progress   { @apply memo-section border-sticky-blue; }
-  .memo-section-blocked    { @apply memo-section border-sticky-pink; }
-  .memo-section-next       { @apply memo-section border-sticky-yellow; }
-  .memo-section-notes      { @apply memo-section border-border; }
+  /* ── MEMO SECTIONS ───────────────────────────────────── */
+  .memo-section           { @apply border-l-4 border-ink       pl-4 py-1 mb-4 transition-colors duration-150; }
+  .memo-section-completed { @apply memo-section border-sticky-green;  }
+  .memo-section-progress  { @apply memo-section border-sticky-blue;   }
+  .memo-section-blocked   { @apply memo-section border-sticky-pink;   }
+  .memo-section-next      { @apply memo-section border-sticky-yellow; }
+  .memo-section-notes     { @apply memo-section border-border;        }
 
   /* ── TIMELINE ────────────────────────────────────────── */
+  .timeline-item { @apply relative pl-6 pb-6; }
+  .timeline-item::before { content:''; @apply absolute left-0 top-2 bottom-0 w-px bg-border; }
+  .timeline-dot { @apply absolute left-0 top-2 w-2 h-2 rounded-full border-2 border-ink bg-paper-cream -translate-x-[3px] transition-colors duration-200; }
 
-  .timeline-item {
-    @apply relative pl-6 pb-6;
-  }
-  .timeline-item::before {
-    content: '';
-    @apply absolute left-0 top-2 bottom-0 w-px bg-border;
-  }
-  .timeline-dot {
-    @apply absolute left-0 top-2 w-2 h-2 rounded-full border-2 border-ink bg-paper-cream -translate-x-[3px];
-  }
-
-  /* ── AVATAR STACK ────────────────────────────────────── */
-
+  /* ── AVATAR ──────────────────────────────────────────── */
   .avatar {
     @apply rounded-full border-2 border-paper-cream flex items-center justify-center
            font-bold text-ink overflow-hidden flex-shrink-0;
     font-family: 'Space Grotesk', system-ui, sans-serif;
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
   }
-  .avatar-sm  { @apply avatar w-7 h-7 text-xs; }
-  .avatar-md  { @apply avatar w-9 h-9 text-sm; }
+  .avatar:hover { transform: scale(1.08); box-shadow: 0 2px 8px rgba(0,0,0,0.15); }
+  .avatar-sm  { @apply avatar w-7 h-7  text-xs;  }
+  .avatar-md  { @apply avatar w-9 h-9  text-sm;  }
   .avatar-lg  { @apply avatar w-12 h-12 text-base; }
-
   .avatar-stack { @apply flex; }
   .avatar-stack .avatar { @apply -ml-2 first:ml-0; }
 
   /* ── EMPTY STATE ─────────────────────────────────────── */
-
-  .empty-state {
-    @apply flex flex-col items-center justify-center py-16 px-6 text-center;
-  }
+  .empty-state { @apply flex flex-col items-center justify-center py-16 px-6 text-center; }
   .empty-state-icon {
-    @apply w-12 h-12 rounded-card border-2 border-dashed border-border
-           flex items-center justify-center text-ink-faint mb-4;
+    @apply w-14 h-14 rounded-card border-2 border-dashed border-border
+           flex items-center justify-center text-ink-faint mb-4
+           transition-all duration-200;
   }
+  .empty-state:hover .empty-state-icon { @apply border-ink text-ink-muted; }
 
   /* ── DIVIDER ─────────────────────────────────────────── */
+  .divider { @apply border-t-2 border-dashed border-border my-6; }
 
-  .divider {
-    @apply border-t-2 border-dashed border-border my-6;
-  }
+  /* ── SPINNER ─────────────────────────────────────────── */
+  .spinner { @apply w-5 h-5 border-2 border-ink border-t-transparent rounded-full animate-spin; }
 
-  /* ── LOADING SPINNER ─────────────────────────────────── */
-
-  .spinner {
-    @apply w-5 h-5 border-2 border-ink border-t-transparent rounded-full animate-spin;
-  }
-
-  /* ── TOOLTIP / HINT ──────────────────────────────────── */
-
-  .hint {
-    @apply text-xs text-ink-muted italic;
-  }
+  /* ── HINT ────────────────────────────────────────────── */
+  .hint { @apply text-xs text-ink-muted italic; }
 
   /* ── ACTIVITY PILL ───────────────────────────────────── */
-
   .activity-pill {
     @apply inline-flex items-center gap-1.5 px-2.5 py-1 rounded-pill
-           bg-paper-dark border border-border text-xs font-mono text-ink-soft;
+           bg-paper-dark border border-border text-xs font-mono text-ink-soft
+           transition-colors duration-150 hover:border-ink hover:text-ink;
   }
+
+  /* ── TOOLTIP ─────────────────────────────────────────── */
+  [data-tooltip] { @apply relative; }
+  [data-tooltip]::after {
+    content: attr(data-tooltip);
+    @apply absolute -top-8 left-1/2 -translate-x-1/2
+           bg-ink text-paper-cream text-[11px] font-display font-semibold
+           px-2 py-1 rounded-editorial whitespace-nowrap
+           pointer-events-none opacity-0 transition-opacity duration-150;
+  }
+  [data-tooltip]:hover::after { @apply opacity-100; }
+
+  /* ── NAV CHIP ────────────────────────────────────────── */
+  .nav-chip {
+    @apply inline-flex items-center gap-1 px-3 py-1 rounded-pill text-xs font-bold font-display
+           border-2 border-ink transition-all duration-150 cursor-pointer shadow-editorial-sm;
+  }
+  .nav-chip:hover {
+    @apply shadow-none;
+    transform: translate(1px, 1px);
+  }
+
+  /* ── SCROLL REVEAL (JS adds .revealed) ──────────────── */
+  .reveal {
+    opacity: 0;
+    transform: translateY(24px);
+    transition: opacity 0.5s ease, transform 0.5s ease;
+  }
+  .reveal.revealed {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  .reveal-delay-1 { transition-delay: 0.1s; }
+  .reveal-delay-2 { transition-delay: 0.2s; }
+  .reveal-delay-3 { transition-delay: 0.3s; }
 }
