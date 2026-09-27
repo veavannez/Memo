@@ -3,10 +3,9 @@
 @tailwind utilities;
 
 /* ═══════════════════════════════════════════════════════════
-   KEYFRAMES — every animation in one place
+   KEYFRAMES
 ═══════════════════════════════════════════════════════════ */
 
-/* Sticky note entrances — spring physics feel */
 @keyframes sticky-in-1 {
   0%   { opacity:0; transform: translateY(-80px) rotate(-12deg) scale(0.6); }
   55%  { opacity:1; transform: translateY(8px)   rotate(2deg)   scale(1.05);}
@@ -37,11 +36,18 @@
   100% { opacity:1; transform: translateY(0)    rotate(2.5deg) scale(1);   }
 }
 
-/* Continuous idle drift — each unique */
+/* Settle-once (no looping) */
+.sticky-settle-1 { animation: sticky-in-1 .7s cubic-bezier(.34,1.4,.64,1) .1s both; }
+.sticky-settle-2 { animation: sticky-in-2 .7s cubic-bezier(.34,1.4,.64,1) .22s both; }
+.sticky-settle-3 { animation: sticky-in-3 .7s cubic-bezier(.34,1.4,.64,1) .38s both; }
+.sticky-settle-4 { animation: sticky-in-4 .7s cubic-bezier(.34,1.4,.64,1) .52s both; }
+.sticky-settle-5 { animation: sticky-in-5 .7s cubic-bezier(.34,1.4,.64,1) .66s both; }
+
+/* Legacy drift (landing page only) */
 @keyframes drift-1 { 0%,100%{transform:rotate(-2deg) translateY(0);}  40%{transform:rotate(-1deg) translateY(-5px);} 70%{transform:rotate(-3deg) translateY(3px);} }
 @keyframes drift-2 { 0%,100%{transform:rotate(1.5deg) translateY(0);} 40%{transform:rotate(2.5deg) translateY(-4px);}70%{transform:rotate(0deg) translateY(4px); } }
-@keyframes drift-3 { 0%,100%{transform:rotate(3deg) translateY(0);}   50%{transform:rotate(2deg) translateY(-6px);}                                               }
-@keyframes drift-4 { 0%,100%{transform:rotate(-3deg) translateY(0);}  50%{transform:rotate(-2deg) translateY(5px);}                                               }
+@keyframes drift-3 { 0%,100%{transform:rotate(3deg) translateY(0);}   50%{transform:rotate(2deg) translateY(-6px);} }
+@keyframes drift-4 { 0%,100%{transform:rotate(-3deg) translateY(0);}  50%{transform:rotate(-2deg) translateY(5px);} }
 @keyframes drift-5 { 0%,100%{transform:rotate(2.5deg) translateY(0);} 33%{transform:rotate(1deg) translateY(-3px);} 66%{transform:rotate(3.5deg) translateY(2px);}  }
 
 /* Hero text stagger */
@@ -50,60 +56,51 @@
   100% { opacity:1; transform:translateY(0)    skewY(0deg); clip-path: inset(0 0 0% 0);   }
 }
 
-/* Fade up — general sections */
 @keyframes fade-up {
   from { opacity:0; transform:translateY(28px); }
   to   { opacity:1; transform:translateY(0);    }
 }
 
-/* Horizontal marquee ticker */
+@keyframes fade-in {
+  from { opacity:0; }
+  to   { opacity:1; }
+}
+
 @keyframes marquee {
   from { transform: translateX(0); }
   to   { transform: translateX(-50%); }
 }
 
-/* Pulse dot — live indicator */
 @keyframes pulse-dot {
   0%,100% { transform:scale(1);   opacity:1;   }
   50%     { transform:scale(1.6); opacity:0.5; }
 }
 
-/* Nav underline slide in */
-@keyframes nav-underline {
-  from { transform: scaleX(0); }
-  to   { transform: scaleX(1); }
-}
-
-/* Card tilt on hover — handled via JS for cursor tracking */
 @keyframes card-appear {
   from { opacity:0; transform:scale(0.94) translateY(12px); }
   to   { opacity:1; transform:scale(1)    translateY(0);    }
 }
 
-/* Shimmer on CTA button */
 @keyframes shimmer {
   0%   { background-position: -200% center; }
   100% { background-position: 200%  center; }
 }
 
-/* Cursor glow follow — used with JS */
-@keyframes glow-fade {
-  from { opacity: 0.18; }
-  to   { opacity: 0;    }
+@keyframes monitor-enter {
+  0%   { opacity:0; transform: translateX(60px); }
+  100% { opacity:1; transform: translateX(0); }
+}
+
+@keyframes note-settle {
+  0%   { opacity:0; transform: translateY(-24px) scale(0.88); }
+  70%  { opacity:1; transform: translateY(3px) scale(1.02); }
+  100% { opacity:1; transform: translateY(0) scale(1); }
 }
 
 /* ═══════════════════════════════════════════════════════════
    ANIMATION UTILITY CLASSES
 ═══════════════════════════════════════════════════════════ */
 
-/* Sticky note combos: fly-in + idle drift */
-.sticky-anim-1 { animation: sticky-in-1 .75s cubic-bezier(.34,1.56,.64,1) .15s both, drift-1 6.5s ease-in-out 1s infinite; }
-.sticky-anim-2 { animation: sticky-in-2 .75s cubic-bezier(.34,1.56,.64,1) .30s both, drift-2 7.5s ease-in-out 1.2s infinite; }
-.sticky-anim-3 { animation: sticky-in-3 .75s cubic-bezier(.34,1.56,.64,1) .50s both, drift-3 9s ease-in-out 1.5s infinite; }
-.sticky-anim-4 { animation: sticky-in-4 .75s cubic-bezier(.34,1.56,.64,1) .08s both, drift-4 5.5s ease-in-out .8s infinite; }
-.sticky-anim-5 { animation: sticky-in-5 .75s cubic-bezier(.34,1.56,.64,1) .65s both, drift-5 8s ease-in-out 1.8s infinite; }
-
-/* Staggered hero words */
 .word-rise   { display:inline-block; overflow:hidden; animation: word-rise .65s cubic-bezier(.22,1,.36,1) both; }
 .word-rise-1 { animation-delay: .05s; }
 .word-rise-2 { animation-delay: .18s; }
@@ -111,20 +108,19 @@
 .word-rise-4 { animation-delay: .42s; }
 .word-rise-5 { animation-delay: .54s; }
 
-/* General fade-up stagger */
 .fade-up-1 { animation: fade-up .55s ease .4s  both; }
 .fade-up-2 { animation: fade-up .55s ease .55s both; }
 .fade-up-3 { animation: fade-up .55s ease .70s both; }
 .fade-up-4 { animation: fade-up .55s ease .85s both; }
 .fade-up-5 { animation: fade-up .55s ease 1.0s both; }
 
-/* Live pulse dot */
+.monitor-enter { animation: monitor-enter 0.7s cubic-bezier(0.22,1,0.36,1) .2s forwards; opacity: 0; }
+
 .pulse-dot {
   @apply w-2 h-2 rounded-full bg-sticky-green;
   animation: pulse-dot 1.8s ease-in-out infinite;
 }
 
-/* Marquee ticker */
 .marquee-wrap { overflow: hidden; }
 .marquee-track {
   display: flex;
@@ -133,13 +129,11 @@
 }
 .marquee-track:hover { animation-play-state: paused; }
 
-/* Dot grid background */
 .bg-dot-grid {
   background-image: radial-gradient(circle, #C4BFB4 1px, transparent 1px);
   background-size: 24px 24px;
 }
 
-/* Shimmer button */
 .btn-shimmer {
   background: linear-gradient(
     110deg,
@@ -167,17 +161,18 @@
   body {
     background-color: #F5F2EC;
     color: #2C2C2C;
-    font-family: 'Inter', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+    font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
     font-size: 15px;
     line-height: 1.6;
     cursor: default;
   }
 
+  /* Headings use DM Sans by default; apply font-display manually for Bebas Neue */
   h1, h2, h3, h4, h5, h6 {
-    font-family: 'Space Grotesk', 'Inter', system-ui, sans-serif;
+    font-family: 'DM Sans', system-ui, sans-serif;
     font-weight: 700;
     color: #0F0F0F;
-    line-height: 1.05;
+    line-height: 1.1;
     letter-spacing: -0.02em;
   }
 
@@ -188,43 +183,41 @@
   ::-webkit-scrollbar-thumb { background: #C4BFB4; border-radius: 3px; }
   ::-webkit-scrollbar-thumb:hover { background: #9E9990; }
 
-  /* Focus rings use ink color */
   :focus-visible { outline: 2px solid #0F0F0F; outline-offset: 3px; border-radius: 2px; }
 }
 
 /* ═══════════════════════════════════════════════════════════
-   TYPOGRAPHY UTILITIES
+   TYPOGRAPHY
 ═══════════════════════════════════════════════════════════ */
 @layer utilities {
-  .font-display { font-family: 'Space Grotesk', 'Inter', system-ui, sans-serif; }
-
+  /* Bebas Neue — poster/editorial headings only */
   .text-display-2xl {
-    font-family: 'Space Grotesk', system-ui, sans-serif;
-    font-size: clamp(3.2rem, 9vw, 7.5rem);
-    line-height: 0.92;
-    letter-spacing: -0.035em;
-    font-weight: 800;
+    font-family: 'Bebas Neue', system-ui, sans-serif;
+    font-size: clamp(4rem, 10vw, 9rem);
+    line-height: 0.9;
+    letter-spacing: 0.02em;
+    font-weight: 400;
   }
   .text-display-xl {
-    font-family: 'Space Grotesk', system-ui, sans-serif;
-    font-size: clamp(2.2rem, 5vw, 4.5rem);
-    line-height: 1.0;
-    letter-spacing: -0.028em;
-    font-weight: 800;
+    font-family: 'Bebas Neue', system-ui, sans-serif;
+    font-size: clamp(2.5rem, 6vw, 5rem);
+    line-height: 0.95;
+    letter-spacing: 0.02em;
+    font-weight: 400;
   }
   .text-display-lg {
-    font-family: 'Space Grotesk', system-ui, sans-serif;
-    font-size: clamp(1.6rem, 3vw, 2.8rem);
-    line-height: 1.05;
-    letter-spacing: -0.02em;
-    font-weight: 700;
+    font-family: 'Bebas Neue', system-ui, sans-serif;
+    font-size: clamp(1.8rem, 3.5vw, 3rem);
+    line-height: 1.0;
+    letter-spacing: 0.02em;
+    font-weight: 400;
   }
   .text-display-md {
-    font-family: 'Space Grotesk', system-ui, sans-serif;
-    font-size: clamp(1.05rem, 1.8vw, 1.5rem);
-    line-height: 1.15;
-    letter-spacing: -0.015em;
-    font-weight: 700;
+    font-family: 'Bebas Neue', system-ui, sans-serif;
+    font-size: clamp(1.2rem, 2vw, 1.8rem);
+    line-height: 1.05;
+    letter-spacing: 0.03em;
+    font-weight: 400;
   }
 
   .underline-yellow {
@@ -272,14 +265,14 @@
 
   /* ── STICKY NOTES ────────────────────────────────────── */
   .sticky {
-    @apply rounded-sticky border border-black/10 shadow-sticky p-4 text-ink font-sans;
-    font-size: 13px;
+    @apply rounded-sticky border border-black/10 shadow-sticky p-4 text-ink font-handwritten;
+    font-size: 14px;
     line-height: 1.5;
     transition: transform 0.2s ease, box-shadow 0.2s ease;
   }
   .sticky:hover {
-    box-shadow: 3px 5px 14px rgba(0,0,0,0.18);
-    transform: scale(1.03);
+    box-shadow: 3px 5px 18px rgba(0,0,0,0.2);
+    transform: scale(1.04) translateY(-3px) rotate(0deg) !important;
   }
   .sticky-yellow   { @apply sticky bg-sticky-yellow;   }
   .sticky-green    { @apply sticky bg-sticky-green;    }
@@ -300,7 +293,7 @@
   /* ── BUTTONS ─────────────────────────────────────────── */
   .btn {
     @apply inline-flex items-center justify-center gap-2 font-semibold text-sm
-           select-none cursor-pointer transition-all duration-150
+           select-none cursor-pointer transition-all duration-150 font-sans
            focus-visible:ring-2 focus-visible:ring-ink focus-visible:ring-offset-2;
   }
   .btn-primary {
@@ -335,18 +328,39 @@
     @apply btn bg-transparent text-ink-muted border border-border rounded-card
            p-2 hover:bg-paper-dark hover:text-ink hover:border-ink active:scale-90;
   }
+  /* END SESSION — the dominant CTA at project level */
+  .btn-end-session {
+    @apply btn bg-sticky-yellow text-ink border-2 border-ink rounded-editorial
+           px-6 py-3 shadow-editorial font-bold text-base
+           hover:shadow-none hover:translate-x-0.5 hover:translate-y-0.5
+           active:scale-95;
+  }
+  /* CATCH ME UP — dominant CTA on return */
+  .btn-catch-me-up {
+    @apply btn bg-sticky-orange text-ink border-2 border-ink rounded-editorial
+           px-6 py-3 shadow-editorial font-bold text-base
+           hover:shadow-none hover:translate-x-0.5 hover:translate-y-0.5
+           active:scale-95;
+  }
+  /* CREATE TASKS — dominant CTA after memo */
+  .btn-create-tasks {
+    @apply btn bg-sticky-green text-ink border-2 border-ink rounded-editorial
+           px-6 py-3 shadow-editorial font-bold text-base
+           hover:shadow-none hover:translate-x-0.5 hover:translate-y-0.5
+           active:scale-95;
+  }
 
   /* ── FORM CONTROLS ───────────────────────────────────── */
   .input {
     @apply w-full rounded-editorial border-2 border-border bg-paper-cream
-           px-3 py-2 text-sm text-ink
+           px-3 py-2 text-sm text-ink font-sans
            focus:border-ink focus:outline-none
            placeholder:text-ink-faint
            transition-all duration-150;
   }
   .input:focus { box-shadow: 3px 3px 0px #0F0F0F; }
   .textarea { @apply input resize-none leading-relaxed; min-height: 100px; }
-  .label { @apply block text-xs font-semibold text-ink-muted uppercase tracking-widest mb-1.5 font-display; }
+  .label { @apply block text-xs font-bold text-ink-muted uppercase tracking-widest mb-1.5 font-sans; }
   .select { @apply input appearance-none cursor-pointer; }
 
   /* ── BADGES ──────────────────────────────────────────── */
@@ -363,6 +377,7 @@
   .badge-low         { @apply badge bg-paper-dark    text-ink-muted border-border;  }
   .badge-owner       { @apply badge bg-sticky-lavender text-ink     border-ink/20; }
   .badge-member      { @apply badge bg-paper-dark    text-ink-muted border-border;  }
+  .badge-demo        { @apply badge bg-sticky-yellow text-ink       border-ink/30; }
 
   /* ── NAVIGATION ──────────────────────────────────────── */
   .nav-root {
@@ -372,8 +387,7 @@
   .nav-link {
     @apply relative flex items-center gap-1.5 px-3 py-2.5 text-sm font-semibold
            text-ink-muted border-b-2 border-transparent
-           transition-all duration-200 hover:text-ink;
-    font-family: 'Space Grotesk', system-ui, sans-serif;
+           transition-all duration-200 hover:text-ink font-sans;
   }
   .nav-link::after {
     content: '';
@@ -387,8 +401,7 @@
 
   /* ── SECTION HEADING ─────────────────────────────────── */
   .section-heading {
-    @apply text-xs font-bold uppercase tracking-[0.15em] text-ink-muted mb-3;
-    font-family: 'Space Grotesk', system-ui, sans-serif;
+    @apply text-xs font-bold uppercase tracking-[0.15em] text-ink-muted mb-3 font-sans;
   }
 
   /* ── MEMO SECTIONS ───────────────────────────────────── */
@@ -407,8 +420,7 @@
   /* ── AVATAR ──────────────────────────────────────────── */
   .avatar {
     @apply rounded-full border-2 border-paper-cream flex items-center justify-center
-           font-bold text-ink overflow-hidden flex-shrink-0;
-    font-family: 'Space Grotesk', system-ui, sans-serif;
+           font-bold text-ink overflow-hidden flex-shrink-0 font-sans;
     transition: transform 0.15s ease, box-shadow 0.15s ease;
   }
   .avatar:hover { transform: scale(1.08); box-shadow: 0 2px 8px rgba(0,0,0,0.15); }
@@ -448,7 +460,7 @@
   [data-tooltip]::after {
     content: attr(data-tooltip);
     @apply absolute -top-8 left-1/2 -translate-x-1/2
-           bg-ink text-paper-cream text-[11px] font-display font-semibold
+           bg-ink text-paper-cream text-[11px] font-sans font-semibold
            px-2 py-1 rounded-editorial whitespace-nowrap
            pointer-events-none opacity-0 transition-opacity duration-150;
   }
@@ -456,7 +468,7 @@
 
   /* ── NAV CHIP ────────────────────────────────────────── */
   .nav-chip {
-    @apply inline-flex items-center gap-1 px-3 py-1 rounded-pill text-xs font-bold font-display
+    @apply inline-flex items-center gap-1 px-3 py-1 rounded-pill text-xs font-bold font-sans
            border-2 border-ink transition-all duration-150 cursor-pointer shadow-editorial-sm;
   }
   .nav-chip:hover {
@@ -464,7 +476,7 @@
     transform: translate(1px, 1px);
   }
 
-  /* ── SCROLL REVEAL (JS adds .revealed) ──────────────── */
+  /* ── SCROLL REVEAL ───────────────────────────────────── */
   .reveal {
     opacity: 0;
     transform: translateY(24px);
@@ -477,4 +489,19 @@
   .reveal-delay-1 { transition-delay: 0.1s; }
   .reveal-delay-2 { transition-delay: 0.2s; }
   .reveal-delay-3 { transition-delay: 0.3s; }
+
+  /* ── WORKFLOW STEP INDICATOR ─────────────────────────── */
+  .workflow-step {
+    @apply flex items-center gap-2 text-xs font-sans font-medium text-ink-muted;
+  }
+  .workflow-step-active {
+    @apply workflow-step text-ink font-bold;
+  }
+  .workflow-step-dot {
+    @apply w-2 h-2 rounded-full bg-border flex-shrink-0;
+  }
+  .workflow-step-dot-active {
+    @apply w-2 h-2 rounded-full bg-sticky-yellow flex-shrink-0;
+    box-shadow: 0 0 0 3px rgba(245,230,66,0.3);
+  }
 }

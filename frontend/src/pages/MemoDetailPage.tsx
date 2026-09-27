@@ -2,83 +2,110 @@ import React, { useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '../lib/api';
+import { DEMO_MEMOS, DEMO_TASKS, isDemoMode } from '../lib/demo';
 import type { Memo, Task } from '../types';
+import { timeAgo, formatDateTime, statusBadgeClass, getStatusLabel } from '../lib/utils';
 import {
-  timeAgo, formatDateTime, statusBadgeClass, priorityBadgeClass,
-  getStatusLabel, getPriorityLabel,
-} from '../lib/utils';
-import { GitCommit, GitPullRequest, ExternalLink, Edit, Plus, AlertTriangle, CheckCircle } from 'lucide-react';
+  GitCommit, GitPullRequest, ExternalLink, Edit, Plus,
+  AlertTriangle, CheckCircle, ArrowLeft, ArrowRight, CheckSquare,
+} from 'lucide-react';
 import { MemoForm } from '../features/memos/MemoForm';
 import toast from 'react-hot-toast';
 
+// ─── Memo section block ───────────────────────────────────────────────────────
+function MemoSection({
+  label, icon, children, accent = 'border-ink',
+}: {
+  label: string;
+  icon?: React.ReactNode;
+  children: React.ReactNode;
+  accent?: string;
+}) {
+  return (
+    <div className={`border-l-4 ${accent} pl-4 py-1 mb-5`}>
+      <div className="flex items-center gap-1.5 mb-2">
+        {icon}
+        <span className="section-heading mb-0">{label}</span>
+      </div>
+      {children}
+    </div>
+  );
+}
+
 export default function MemoDetailPage() {
   const { projectId, memoId } = useParams<{ projectId: string; memoId: string }>();
+  const navigate = useNavigate();
   const [editing, setEditing] = useState(false);
   const [convertingTasks, setConvertingTasks] = useState(false);
   const [selectedSteps, setSelectedSteps] = useState<string[]>([]);
   const queryClient = useQueryClient();
+  const isDemo = isDemoMode();
 
   const { data: memo, isLoading } = useQuery<Memo>({
     queryKey: ['memo', projectId, memoId],
-    queryFn: () => api.get(`/projects/${projectId}/memos/${memoId}`).then((r) => r.data),
+    queryFn: () => {
+      if (isDemo) {
+        const m = DEMO_MEMOS.find((m) => m.id === Number(memoId));
+        return Promise.resolve(m ?? DEMO_MEMOS[0]);
+      }
+      return api.get(`/projects/${projectId}/memos/${memoId}`).then((r) => r.data);
+    },
     enabled: !!projectId && !!memoId,
   });
 
   const { data: tasks = [] } = useQuery<Task[]>({
     queryKey: ['tasks', projectId, { source_memo: memoId }],
-    queryFn: () =>
-      api.get(`/projects/${projectId}/tasks`).then((r) =>
+    queryFn: () => {
+      if (isDemo) return Promise.resolve(DEMO_TASKS.filter((t) => t.source_memo_id === Number(memoId)));
+      return api.get(`/projects/${projectId}/tasks`).then((r) =>
         r.data.filter((t: Task) => t.source_memo_id === Number(memoId))
-      ),
+      );
+    },
     enabled: !!projectId && !!memoId,
   });
 
-  const refreshActivity = useMutation({
-    mutationFn: () =>
-      api.post(`/projects/${projectId}/memos/${memoId}/refresh-activity`).then((r) => r.data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['memo', projectId, memoId] });
-      toast.success('GitHub activity refreshed');
-    },
-  });
-
   const createFromNextSteps = useMutation({
-    mutationFn: (steps: string[]) =>
-      api.post(`/projects/${projectId}/tasks/from-memo/${memoId}`, {
+    mutationFn: (steps: string[]) => {
+      if (isDemo) {
+        return Promise.resolve({ created: steps.length });
+      }
+      return api.post(`/projects/${projectId}/tasks/from-memo/${memoId}`, {
         next_steps: steps,
         priority: 'medium',
-      }).then((r) => r.data),
+      }).then((r) => r.data);
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['tasks', projectId] });
-      toast.success('Tasks created!');
+      toast.success('Tasks created! Head to Kanban to track them.');
       setConvertingTasks(false);
       setSelectedSteps([]);
     },
     onError: () => toast.error('Failed to create tasks'),
   });
 
-  if (isLoading) {
+  if (isLoading || !memo) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
-        <div className="w-6 h-6 border-2 border-gray-900 border-t-transparent rounded-full animate-spin" />
+        <div className="spinner" />
       </div>
     );
   }
-
-  if (!memo) return <div className="p-8 text-gray-500">Memo not found.</div>;
 
   const nextStepLines = memo.next_steps
     ? memo.next_steps.split('\n').map((l) => l.trim().replace(/^[-•*]\s*/, '')).filter(Boolean)
     : [];
 
   const commits = memo.github_activities.filter((a) => a.activity_type === 'commit');
-  const prs = memo.github_activities.filter((a) => a.activity_type === 'pull_request');
+  const prs     = memo.github_activities.filter((a) => a.activity_type === 'pull_request');
+
+  // Workflow progress
+  const hasTasks = tasks.length > 0;
 
   if (editing) {
     return (
-      <div className="max-w-3xl mx-auto px-4 sm:px-6 py-8">
-        <h1 className="text-2xl font-bold text-gray-900 mb-6">Edit Memo</h1>
-        <div className="card p-6">
+      <div className="max-w-3xl mx-auto px-5 sm:px-8 py-8">
+        <h1 className="text-2xl font-bold text-ink mb-6">Edit Memo</h1>
+        <div className="card-editorial p-6">
           <MemoForm
             projectId={projectId!}
             initial={memo}
@@ -94,183 +121,229 @@ export default function MemoDetailPage() {
   }
 
   return (
-    <div className="max-w-4xl mx-auto px-4 sm:px-6 py-8">
+    <div className="max-w-5xl mx-auto px-5 sm:px-8 py-8">
+
+      {/* Back */}
+      <button
+        onClick={() => navigate(-1)}
+        className="flex items-center gap-1.5 text-sm text-ink-muted hover:text-ink transition-colors mb-6 group"
+      >
+        <ArrowLeft className="w-4 h-4 group-hover:-translate-x-0.5 transition-transform" />
+        Back to Memos
+      </button>
+
+      {/* Workflow progress bar */}
+      <div className="flex items-center gap-2 mb-6 flex-wrap">
+        {[
+          { label: 'End Session',  color: 'bg-sticky-yellow', done: true   },
+          { label: 'Create Tasks', color: 'bg-sticky-green',  done: hasTasks, active: !hasTasks },
+          { label: 'Kanban',       color: 'bg-sticky-blue',   done: false  },
+          { label: 'Catch Me Up',  color: 'bg-sticky-orange', done: false  },
+        ].map(({ label, color, done, active }) => (
+          <div key={label} className={done ? 'workflow-step text-ink-faint line-through' : active ? 'workflow-step-active' : 'workflow-step'}>
+            <span className={done ? 'workflow-step-dot bg-sticky-green' : active ? 'workflow-step-dot-active' : 'workflow-step-dot'} />
+            {label}
+          </div>
+        ))}
+      </div>
+
       {/* Header */}
-      <div className="flex items-start justify-between mb-6">
+      <div className="flex items-start justify-between mb-7 gap-4 flex-wrap">
         <div>
           <div className="flex items-center gap-2 mb-1">
-            {memo.author?.avatar_url && (
-              <img
-                src={memo.author.avatar_url}
-                alt={memo.author.display_name}
-                className="w-7 h-7 rounded-full"
-              />
+            {memo.author?.avatar_url ? (
+              <img src={memo.author.avatar_url} alt={memo.author.display_name} className="avatar-sm rounded-full" />
+            ) : (
+              <div className="avatar-sm bg-sticky-blue flex items-center justify-center text-ink font-bold">
+                {memo.author?.display_name[0]}
+              </div>
             )}
-            <span className="text-sm font-medium text-gray-700">{memo.author?.display_name}</span>
-            {memo.is_draft && (
-              <span className="badge bg-gray-100 text-gray-600">Draft</span>
-            )}
+            <span className="font-semibold text-ink">{memo.author?.display_name}</span>
+            {memo.is_draft && <span className="badge-todo">Draft</span>}
           </div>
-          <p className="text-xs text-gray-400">{formatDateTime(memo.created_at)}</p>
+          <p className="text-xs text-ink-faint">{formatDateTime(memo.created_at)}</p>
         </div>
-        <div className="flex gap-2">
-          <button
-            className="btn-secondary text-xs"
-            onClick={() => refreshActivity.mutate()}
-            disabled={refreshActivity.isPending}
-          >
-            {refreshActivity.isPending ? 'Refreshing…' : 'Refresh Activity'}
-          </button>
-          <button className="btn-secondary" onClick={() => setEditing(true)}>
-            <Edit className="w-4 h-4" />
-            Edit
-          </button>
+        <div className="flex gap-2 flex-shrink-0">
+          {!isDemo && (
+            <button className="btn-secondary text-sm" onClick={() => setEditing(true)}>
+              <Edit className="w-4 h-4" />
+              Edit
+            </button>
+          )}
         </div>
       </div>
 
+      {/* ── CREATE TASKS primary CTA — appears before body when next steps exist ── */}
+      {nextStepLines.length > 0 && !hasTasks && (
+        <div className="sticky-green sticky mb-6">
+          <div className="flex items-center justify-between gap-4 flex-wrap">
+            <div>
+              <p className="font-bold text-sm text-ink mb-0.5">
+                {nextStepLines.length} next step{nextStepLines.length > 1 ? 's' : ''} ready to convert
+              </p>
+              <p className="text-xs text-ink-soft">
+                Turn your next steps into tracked tasks on the Kanban board.
+              </p>
+            </div>
+            <button
+              className="btn-create-tasks flex-shrink-0"
+              onClick={() => {
+                setConvertingTasks(true);
+                setSelectedSteps(nextStepLines);
+              }}
+            >
+              <CheckSquare className="w-5 h-5" />
+              Create Tasks
+            </button>
+          </div>
+          {/* Task conversion form (inline) */}
+          {convertingTasks && (
+            <div className="mt-4 pt-4 border-t border-ink/20">
+              <p className="text-xs font-bold text-ink mb-3 uppercase tracking-widest">Select steps to convert:</p>
+              <div className="space-y-1.5 mb-4">
+                {nextStepLines.map((step, i) => (
+                  <label key={i} className="flex items-center gap-2 text-sm text-ink cursor-pointer hover:text-ink-soft transition-colors">
+                    <input
+                      type="checkbox"
+                      checked={selectedSteps.includes(step)}
+                      onChange={(e) =>
+                        setSelectedSteps((prev) =>
+                          e.target.checked ? [...prev, step] : prev.filter((s) => s !== step)
+                        )
+                      }
+                      className="rounded border-ink/30 accent-ink"
+                    />
+                    {step}
+                  </label>
+                ))}
+              </div>
+              <div className="flex gap-2">
+                <button
+                  className="btn-primary text-sm"
+                  onClick={() => createFromNextSteps.mutate(selectedSteps)}
+                  disabled={selectedSteps.length === 0 || createFromNextSteps.isPending}
+                >
+                  {createFromNextSteps.isPending
+                    ? 'Creating…'
+                    : `Create ${selectedSteps.length} Task${selectedSteps.length > 1 ? 's' : ''}`}
+                </button>
+                <button className="btn-ghost text-sm" onClick={() => setConvertingTasks(false)}>
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Tasks already created — show nav to Kanban */}
+      {hasTasks && (
+        <div className="card border-sticky-green/40 bg-sticky-green/10 px-4 py-3 mb-6 flex items-center justify-between gap-3 flex-wrap">
+          <p className="text-sm text-ink flex items-center gap-2">
+            <CheckCircle className="w-4 h-4 text-sticky-green" />
+            {tasks.length} task{tasks.length > 1 ? 's' : ''} created from this memo
+          </p>
+          <Link to={`/projects/${projectId}/kanban`} className="btn-primary text-sm px-4 py-2">
+            <ArrowRight className="w-4 h-4" />
+            View Kanban
+          </Link>
+        </div>
+      )}
+
+      {/* ── Main content grid ─────────────────────────────── */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2 space-y-5">
-          {/* Sections */}
+        <div className="lg:col-span-2 space-y-0">
+
           {memo.completed && (
-            <MemoSection label="Completed" icon={<CheckCircle className="w-4 h-4 text-green-500" />}>
-              <pre className="whitespace-pre-wrap text-sm text-gray-700 font-sans">{memo.completed}</pre>
+            <MemoSection label="Completed" accent="border-sticky-green" icon={<CheckCircle className="w-4 h-4 text-sticky-green" />}>
+              <pre className="whitespace-pre-wrap text-sm text-ink-soft font-sans leading-relaxed">{memo.completed}</pre>
             </MemoSection>
           )}
 
           {memo.in_progress && (
-            <MemoSection label="In Progress">
-              <pre className="whitespace-pre-wrap text-sm text-gray-700 font-sans">{memo.in_progress}</pre>
+            <MemoSection label="In Progress" accent="border-sticky-blue">
+              <pre className="whitespace-pre-wrap text-sm text-ink-soft font-sans leading-relaxed">{memo.in_progress}</pre>
             </MemoSection>
           )}
 
           {memo.blocked && (
-            <MemoSection
-              label="Blocked"
-              icon={<AlertTriangle className="w-4 h-4 text-yellow-500" />}
-              className="border-yellow-200 bg-yellow-50"
-            >
-              <pre className="whitespace-pre-wrap text-sm text-yellow-800 font-sans">{memo.blocked}</pre>
+            <MemoSection label="Blocked" accent="border-sticky-pink" icon={<AlertTriangle className="w-4 h-4 text-sticky-pink" />}>
+              <pre className="whitespace-pre-wrap text-sm text-ink-soft font-sans leading-relaxed">{memo.blocked}</pre>
             </MemoSection>
           )}
 
           {memo.next_steps && (
-            <MemoSection label="Next Steps">
-              <div className="space-y-1">
+            <MemoSection label="Next Steps" accent="border-sticky-yellow">
+              <div className="space-y-1.5">
                 {nextStepLines.map((step, i) => (
-                  <div key={i} className="flex items-start gap-2">
-                    <span className="text-gray-300 mt-0.5">→</span>
-                    <span className="text-sm text-gray-700">{step}</span>
+                  <div key={i} className="flex items-start gap-2 text-sm text-ink-soft">
+                    <span className="text-sticky-yellow mt-0.5 flex-shrink-0">→</span>
+                    {step}
                   </div>
                 ))}
               </div>
-              {nextStepLines.length > 0 && !convertingTasks && (
-                <button
-                  className="btn-secondary text-xs mt-3"
-                  onClick={() => {
-                    setConvertingTasks(true);
-                    setSelectedSteps(nextStepLines);
-                  }}
-                >
-                  <Plus className="w-3.5 h-3.5" />
-                  Convert to Tasks
-                </button>
-              )}
-              {convertingTasks && (
-                <div className="mt-3 border-t pt-3 border-gray-200">
-                  <p className="text-xs font-medium text-gray-600 mb-2">Select steps to convert:</p>
-                  {nextStepLines.map((step, i) => (
-                    <label key={i} className="flex items-center gap-2 text-sm text-gray-700 mb-1 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={selectedSteps.includes(step)}
-                        onChange={(e) =>
-                          setSelectedSteps((prev) =>
-                            e.target.checked
-                              ? [...prev, step]
-                              : prev.filter((s) => s !== step)
-                          )
-                        }
-                        className="rounded"
-                      />
-                      {step}
-                    </label>
-                  ))}
-                  <div className="flex gap-2 mt-3">
-                    <button
-                      className="btn-primary text-xs"
-                      onClick={() => createFromNextSteps.mutate(selectedSteps)}
-                      disabled={selectedSteps.length === 0 || createFromNextSteps.isPending}
-                    >
-                      {createFromNextSteps.isPending ? 'Creating…' : `Create ${selectedSteps.length} Task${selectedSteps.length > 1 ? 's' : ''}`}
-                    </button>
-                    <button
-                      className="btn-ghost text-xs"
-                      onClick={() => setConvertingTasks(false)}
-                    >
-                      Cancel
-                    </button>
-                  </div>
-                </div>
-              )}
             </MemoSection>
           )}
 
           {memo.notes && (
-            <MemoSection label="Notes">
-              <pre className="whitespace-pre-wrap text-sm text-gray-600 font-sans">{memo.notes}</pre>
+            <MemoSection label="Notes" accent="border-border">
+              <pre className="whitespace-pre-wrap text-sm text-ink-muted font-sans leading-relaxed">{memo.notes}</pre>
             </MemoSection>
           )}
         </div>
 
         {/* Sidebar */}
         <div className="space-y-4">
+
           {/* GitHub Activity */}
           <div className="card p-4">
-            <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">
-              GitHub Activity
-            </h3>
+            <p className="section-heading">GitHub Activity</p>
             {memo.github_activities.length === 0 ? (
-              <p className="text-xs text-gray-400">No activity attached yet.</p>
+              <p className="text-xs text-ink-faint">No activity attached yet.</p>
             ) : (
-              <div className="space-y-2">
+              <div className="space-y-3">
                 {commits.length > 0 && (
                   <div>
-                    <p className="text-xs text-gray-400 mb-1 flex items-center gap-1">
+                    <p className="text-xs text-ink-faint mb-1.5 flex items-center gap-1">
                       <GitCommit className="w-3 h-3" /> {commits.length} commit{commits.length > 1 ? 's' : ''}
                     </p>
-                    {commits.slice(0, 5).map((c) => (
-                      <a
-                        key={c.id}
-                        href={c.url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="block text-xs text-gray-600 hover:text-blue-600 truncate py-0.5 flex items-center gap-1"
-                      >
-                        <code className="text-gray-400 font-mono text-xs">{c.github_id}</code>
-                        <span className="truncate">{c.title}</span>
-                        <ExternalLink className="w-3 h-3 flex-shrink-0 text-gray-300" />
-                      </a>
-                    ))}
+                    <div className="space-y-1">
+                      {commits.slice(0, 5).map((c) => (
+                        <a
+                          key={c.id}
+                          href={c.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex items-center gap-1.5 text-xs text-ink-muted hover:text-ink transition-colors group"
+                        >
+                          <code className="font-mono text-ink-faint">{c.github_id?.slice(0, 7)}</code>
+                          <span className="truncate">{c.title}</span>
+                          <ExternalLink className="w-3 h-3 flex-shrink-0 opacity-0 group-hover:opacity-60 transition-opacity" />
+                        </a>
+                      ))}
+                    </div>
                   </div>
                 )}
                 {prs.length > 0 && (
-                  <div className="mt-2">
-                    <p className="text-xs text-gray-400 mb-1 flex items-center gap-1">
-                      <GitPullRequest className="w-3 h-3" /> {prs.length} pull request{prs.length > 1 ? 's' : ''}
+                  <div>
+                    <p className="text-xs text-ink-faint mb-1.5 flex items-center gap-1">
+                      <GitPullRequest className="w-3 h-3" /> {prs.length} PR{prs.length > 1 ? 's' : ''}
                     </p>
-                    {prs.map((pr) => (
-                      <a
-                        key={pr.id}
-                        href={pr.url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="block text-xs text-gray-600 hover:text-blue-600 truncate py-0.5 flex items-center gap-1"
-                      >
-                        <code className="text-gray-400 font-mono text-xs">#{pr.github_id}</code>
-                        <span className="truncate">{pr.title}</span>
-                        <ExternalLink className="w-3 h-3 flex-shrink-0 text-gray-300" />
-                      </a>
-                    ))}
+                    <div className="space-y-1">
+                      {prs.map((pr) => (
+                        <a
+                          key={pr.id}
+                          href={pr.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex items-center gap-1.5 text-xs text-ink-muted hover:text-ink transition-colors group"
+                        >
+                          <code className="font-mono text-ink-faint">#{pr.github_id}</code>
+                          <span className="truncate">{pr.title}</span>
+                          <ExternalLink className="w-3 h-3 flex-shrink-0 opacity-0 group-hover:opacity-60 transition-opacity" />
+                        </a>
+                      ))}
+                    </div>
                   </div>
                 )}
               </div>
@@ -280,14 +353,12 @@ export default function MemoDetailPage() {
           {/* Tasks from this memo */}
           {tasks.length > 0 && (
             <div className="card p-4">
-              <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">
-                Tasks from this Memo
-              </h3>
+              <p className="section-heading">Tasks from this Memo</p>
               <div className="space-y-2">
                 {tasks.map((task) => (
                   <div key={task.id} className="flex items-start justify-between gap-2">
-                    <span className="text-xs text-gray-700 flex-1">{task.title}</span>
-                    <span className={`${statusBadgeClass(task.status)} text-xs`}>
+                    <span className="text-xs text-ink-soft flex-1 leading-snug">{task.title}</span>
+                    <span className={`${statusBadgeClass(task.status)} flex-shrink-0`}>
                       {getStatusLabel(task.status)}
                     </span>
                   </div>
@@ -295,36 +366,36 @@ export default function MemoDetailPage() {
               </div>
               <Link
                 to={`/projects/${projectId}/kanban`}
-                className="text-xs text-blue-600 hover:underline mt-2 inline-block"
+                className="text-xs text-ink-muted hover:text-ink transition-colors mt-3 inline-flex items-center gap-1 font-medium"
               >
-                View on Kanban →
+                View on Kanban <ArrowRight className="w-3 h-3" />
               </Link>
             </div>
           )}
+
+          {/* Next: Catch Me Up */}
+          <div className="card p-4 border-dashed">
+            <p className="section-heading">What's next?</p>
+            <div className="space-y-2">
+              {!hasTasks && nextStepLines.length > 0 && (
+                <button
+                  className="btn-create-tasks w-full text-sm"
+                  onClick={() => { setConvertingTasks(true); setSelectedSteps(nextStepLines); }}
+                >
+                  <CheckSquare className="w-4 h-4" />
+                  Create Tasks
+                </button>
+              )}
+              <Link to={`/projects/${projectId}/kanban`} className="btn-secondary w-full text-sm">
+                View Kanban
+              </Link>
+              <Link to={`/projects/${projectId}/catch-me-up`} className="btn-catch-me-up w-full text-sm">
+                Catch Me Up
+              </Link>
+            </div>
+          </div>
         </div>
       </div>
-    </div>
-  );
-}
-
-function MemoSection({
-  label,
-  icon,
-  children,
-  className,
-}: {
-  label: string;
-  icon?: React.ReactNode;
-  children: React.ReactNode;
-  className?: string;
-}) {
-  return (
-    <div className={`card p-4 ${className ?? ''}`}>
-      <div className="flex items-center gap-1.5 mb-2">
-        {icon}
-        <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide">{label}</h3>
-      </div>
-      {children}
     </div>
   );
 }
